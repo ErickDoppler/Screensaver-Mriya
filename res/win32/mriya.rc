@@ -1,0 +1,180 @@
+// Windows resources: manifest, screensaver name, settings dialog, version.
+#include <windows.h>
+#include "resource.h"
+
+1 RT_MANIFEST "mriya.manifest"
+IDI_APP ICON "mriya.ico"
+
+STRINGTABLE
+BEGIN
+    IDS_DESCRIPTION "Mriya"
+END
+
+// Two columns. Labels at x+7, trackbars 100 wide, values right-aligned at the
+// group's edge. The scenario and camera pickers at the bottom are created
+// hidden and revealed by Ctrl+Alt+S, which also grows the dialog by
+// SCENES_EXTRA_DU and pushes the buttons down - keep the two in step.
+IDD_CONFIG DIALOGEX 0, 0, 480, 329
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Mriya - Settings"
+FONT 8, "MS Shell Dlg", 400, 0, 1
+BEGIN
+    // ---------------------------------------------------------- left column
+    GROUPBOX        "Input", IDC_STATIC, 7, 7, 229, 74
+    AUTOCHECKBOX    "Mouse looks around   (a click exits)", IDC_MOUSEROT, 14, 20, 200, 10
+    AUTOCHECKBOX    "Exit on mouse move", IDC_EXITMOUSE, 14, 34, 150, 10
+    LTEXT           "Mouse sensitivity", IDC_SENS_LBL, 22, 51, 74, 8
+    CONTROL         "", IDC_SENS, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 100, 48, 100, 15
+    RTEXT           "", IDC_SENS_VAL, 204, 51, 30, 8
+    AUTOCHECKBOX    "Exit on any key   (unchecked: keys fly and pick cameras)", IDC_EXITKEY, 14, 65, 218, 10
+
+    GROUPBOX        "Flight", IDC_STATIC, 7, 85, 229, 135
+    AUTOCHECKBOX    "Keys fly the aircraft   (arrows, A/D, PgUp/PgDn)", IDC_MANUAL, 14, 98, 218, 10
+    LTEXT           "Autopilot back after", IDC_APRES_LBL, 22, 115, 76, 8
+    CONTROL         "", IDC_APRES, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 100, 112, 100, 15
+    RTEXT           "", IDC_APRES_VAL, 202, 115, 32, 8
+    LTEXT           "Leg length", IDC_STATIC, 14, 132, 82, 8
+    CONTROL         "", IDC_LEG, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 100, 129, 100, 15
+    RTEXT           "", IDC_LEG_VAL, 202, 132, 32, 8
+    LTEXT           "Turn diameter", IDC_STATIC, 14, 149, 82, 8
+    CONTROL         "", IDC_TURN, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 100, 146, 100, 15
+    RTEXT           "", IDC_TURN_VAL, 202, 149, 32, 8
+    LTEXT           "New altitude every", IDC_STATIC, 14, 166, 82, 8
+    CONTROL         "", IDC_ALTCHG, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 100, 163, 100, 15
+    RTEXT           "", IDC_ALTCHG_VAL, 202, 166, 32, 8
+    LTEXT           "Time compression", IDC_STATIC, 14, 183, 82, 8
+    CONTROL         "", IDC_TIMESCALE, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 100, 180, 100, 15
+    RTEXT           "", IDC_TIMESCALE_VAL, 202, 183, 32, 8
+    LTEXT           "Aircraft weight", IDC_STATIC, 14, 200, 82, 8
+    CONTROL         "", IDC_MASS, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 100, 197, 100, 15
+    RTEXT           "", IDC_MASS_VAL, 202, 200, 32, 8
+
+    // --------------------------------------------------------- right column
+    GROUPBOX        "Scenery", IDC_STATIC, 243, 7, 229, 108
+    LTEXT           "Weather changes every", IDC_STATIC, 250, 23, 84, 8
+    CONTROL         "", IDC_WXMIN, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 336, 20, 100, 15
+    RTEXT           "", IDC_WXMIN_VAL, 438, 23, 32, 8
+    LTEXT           "Camera changes every", IDC_STATIC, 250, 40, 84, 8
+    CONTROL         "", IDC_CAMMIN, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 336, 37, 100, 15
+    RTEXT           "", IDC_CAMMIN_VAL, 438, 40, 32, 8
+    LTEXT           "HUD", IDC_STATIC, 250, 57, 36, 8
+    AUTORADIOBUTTON "Off", IDC_HUD_OFF, 290, 56, 34, 10, WS_GROUP | WS_TABSTOP
+    AUTORADIOBUTTON "Captions", IDC_HUD_CAP, 326, 56, 50, 10
+    AUTORADIOBUTTON "Always full", IDC_HUD_FULL, 380, 56, 60, 10
+    LTEXT           "Units", IDC_STATIC, 250, 72, 36, 8
+    AUTORADIOBUTTON "Metric", IDC_UNITS_M, 290, 71, 40, 10, WS_GROUP | WS_TABSTOP
+    AUTORADIOBUTTON "Imperial", IDC_UNITS_IMP, 332, 71, 50, 10
+    AUTOCHECKBOX    "Navigation lights, beacons and strobes", IDC_NAVLIGHTS, 250, 86, 200, 10
+    AUTOCHECKBOX    "Lens effects   (rain on the lens, sun flare)", IDC_LENS, 250, 100, 200, 10
+
+    GROUPBOX        "Picture", IDC_STATIC, 243, 119, 229, 101
+    LTEXT           "Field of view", IDC_STATIC, 250, 135, 84, 8
+    CONTROL         "", IDC_FOV, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 336, 132, 100, 15
+    RTEXT           "", IDC_FOV_VAL, 438, 135, 32, 8
+    LTEXT           "Glow", IDC_STATIC, 250, 152, 84, 8
+    CONTROL         "", IDC_BLOOM, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 336, 149, 100, 15
+    RTEXT           "", IDC_BLOOM_VAL, 438, 152, 32, 8
+    LTEXT           "Quality", IDC_STATIC, 250, 169, 84, 8
+    CONTROL         "", IDC_QUALITY, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 336, 166, 100, 15
+    RTEXT           "", IDC_QUALITY_VAL, 438, 169, 32, 8
+    LTEXT           "Frame rate limit", IDC_STATIC, 250, 186, 84, 8
+    CONTROL         "", IDC_FPS, "msctls_trackbar32", TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP, 336, 183, 100, 15
+    RTEXT           "", IDC_FPS_VAL, 438, 186, 32, 8
+
+    // ---------------------------------------------------------- real time
+    GROUPBOX        "Real time", IDC_STATIC, 7, 224, 465, 40
+    AUTOCHECKBOX    "Fly in the daylight and the live weather of", IDC_RT, 14, 238, 158, 10
+    EDITTEXT        IDC_RT_CITY, 174, 236, 170, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "Find", IDC_RT_FIND, 348, 235, 44, 14
+    LTEXT           "", IDC_RT_PLACE, 14, 251, 454, 8
+
+    // ----------------------------------------------------------- joystick
+    GROUPBOX        "Joystick", IDC_STATIC, 7, 268, 465, 30
+    LTEXT           "", IDC_JOY_NAME, 14, 282, 176, 8
+    AUTOCHECKBOX    "Invert roll", IDC_JOY_INV_ROLL, 194, 281, 62, 10
+    AUTOCHECKBOX    "Invert pitch", IDC_JOY_INV_PITCH, 258, 281, 62, 10
+    AUTOCHECKBOX    "Invert throttle", IDC_JOY_INV_THR, 322, 281, 70, 10
+    AUTOCHECKBOX    "Invert rudder", IDC_JOY_INV_RUD, 396, 281, 70, 10
+
+    // ------------------ the pickers: created hidden, revealed by Ctrl+Alt+S
+    GROUPBOX        "Weather in the rotation", IDC_SCENE_BOX, 7, 307, 465, 118, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Clear morning", IDC_SCENE_FIRST + 0, 14, 321, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Fair-weather cumulus", IDC_SCENE_FIRST + 1, 128, 321, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Towering cumulus", IDC_SCENE_FIRST + 2, 242, 321, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Thunderstorm", IDC_SCENE_FIRST + 3, 356, 321, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Heavy rain", IDC_SCENE_FIRST + 4, 14, 333, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Sea of clouds", IDC_SCENE_FIRST + 5, 128, 333, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Sunset", IDC_SCENE_FIRST + 6, 242, 333, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Sunrise over mountains", IDC_SCENE_FIRST + 7, 356, 333, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Moonlit night", IDC_SCENE_FIRST + 8, 14, 345, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Night thunderstorm", IDC_SCENE_FIRST + 9, 128, 345, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Moonlit cloud deck", IDC_SCENE_FIRST + 10, 242, 345, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Cirrus veil", IDC_SCENE_FIRST + 11, 356, 345, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Snowfall", IDC_SCENE_FIRST + 12, 14, 357, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Summer haze", IDC_SCENE_FIRST + 13, 128, 357, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Blue hour", IDC_SCENE_FIRST + 14, 242, 357, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Desert dust", IDC_SCENE_FIRST + 15, 356, 357, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Aurora borealis", IDC_SCENE_FIRST + 16, 14, 369, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Broken stratocumulus", IDC_SCENE_FIRST + 17, 128, 369, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Altocumulus", IDC_SCENE_FIRST + 18, 242, 369, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Tropical towers", IDC_SCENE_FIRST + 19, 356, 369, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Between the layers", IDC_SCENE_FIRST + 20, 14, 381, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Alpine", IDC_SCENE_FIRST + 21, 128, 381, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Arctic day", IDC_SCENE_FIRST + 22, 242, 381, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Drizzle", IDC_SCENE_FIRST + 23, 356, 381, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Golden sea", IDC_SCENE_FIRST + 24, 14, 393, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Stormy sunset", IDC_SCENE_FIRST + 25, 128, 393, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "The Himalaya", IDC_SCENE_FIRST + 26, 242, 393, 110, 10, NOT WS_VISIBLE
+    PUSHBUTTON      "All", IDC_SCENE_ALL, 14, 407, 44, 14, NOT WS_VISIBLE
+    PUSHBUTTON      "None", IDC_SCENE_NONE, 62, 407, 44, 14, NOT WS_VISIBLE
+
+    GROUPBOX        "Cameras in the rotation", IDC_CAM_BOX, 7, 429, 465, 68, NOT WS_VISIBLE
+    AUTOCHECKBOX    "1  On the nose", IDC_CAM_FIRST + 0, 14, 443, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "2  Between the engines", IDC_CAM_FIRST + 1, 128, 443, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "3  On the spine, aft", IDC_CAM_FIRST + 2, 242, 443, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "4  On top of the fin", IDC_CAM_FIRST + 3, 356, 443, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "5  Right wingtip", IDC_CAM_FIRST + 4, 14, 455, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "6  Cockpit roof", IDC_CAM_FIRST + 5, 128, 455, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "7  Side window", IDC_CAM_FIRST + 6, 242, 455, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "8  Under the chin", IDC_CAM_FIRST + 7, 356, 455, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "9  Behind an engine", IDC_CAM_FIRST + 8, 14, 467, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "0  Tailplane tip", IDC_CAM_FIRST + 9, 128, 467, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "-  Chase plane", IDC_CAM_FIRST + 10, 242, 467, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "=  Wingman", IDC_CAM_FIRST + 11, 356, 467, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "G  Around the aircraft", IDC_CAM_FIRST + 12, 14, 479, 110, 10, NOT WS_VISIBLE
+
+    PUSHBUTTON      "Defaults", IDC_DEFAULTS, 7, 307, 54, 14
+    PUSHBUTTON      "Preview...", IDC_PREVIEW, 65, 307, 60, 14
+    DEFPUSHBUTTON   "OK", IDOK, 360, 307, 52, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 418, 307, 54, 14
+END
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "Andrii Kamlyk"
+            VALUE "FileDescription", "Mriya screensaver"
+            VALUE "FileVersion", "1.0.0.0"
+            VALUE "InternalName", "Mriya"
+            VALUE "LegalCopyright", "Copyright (c) 2026 Andrii Kamlyk. MIT License."
+            VALUE "Comments", "OpenGL screensaver: flying the An-225 Mriya through the weather. Open source."
+            VALUE "OriginalFilename", "Mriya.scr"
+            VALUE "ProductName", "Mriya"
+            VALUE "ProductVersion", "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

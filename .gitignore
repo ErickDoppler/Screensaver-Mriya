@@ -1,0 +1,35 @@
+# --- CMake build output ---
+build/
+out/
+cmake-build-*/
+CMakeUserPresets.json
+compile_commands.json
+.cache/
+
+# --- Binaries ---
+*.exe
+*.scr
+*.obj
+*.pdb
+*.ilk
+*.lib
+*.dll
+
+# --- Logs / captures ---
+*.log
+*.png
+!docs/*.png
+
+# --- IDE / OS ---
+.idea/
+.vs/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# --- Mriya ---
+# the icon's source render is ours, keep it
+!res/win32/icon_render.png
+# the kit decal sheet is only an input to tools/make_decals.py, and not ours
+# to redistribute
+res/textures/decals_reference.png

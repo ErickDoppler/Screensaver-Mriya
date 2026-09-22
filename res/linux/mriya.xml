@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<!-- XScreenSaver settings page for Mriya. Every control maps to one of the
+     screensaver's own command-line settings, so the defaults here must match
+     src/settings.h. Under XScreenSaver, input ends the screensaver, so the
+     flying and camera keys are for running it in a window. -->
+<screensaver name="mriya" _label="Mriya" gl="yes">
+
+  <command arg="-root"/>
+
+  <hgroup>
+   <vgroup>
+    <number id="wxmin" type="slider" arg="--weather-minutes %"
+            _label="Weather changes every (minutes, 0 = never)" _low-label="Never" _high-label="2 h"
+            low="0" high="120" default="5"/>
+    <number id="cammin" type="slider" arg="--camera-minutes %"
+            _label="Camera changes every (minutes, 0 = never)" _low-label="Never" _high-label="1 h"
+            low="0" high="60" default="5"/>
+    <number id="leg" type="slider" arg="--leg-km %"
+            _label="Racetrack leg (km)" _low-label="Short" _high-label="Long"
+            low="50" high="3000" default="1000"/>
+    <number id="altchg" type="slider" arg="--altitude-change-km %"
+            _label="New altitude every (km)" _low-label="Often" _high-label="Rarely"
+            low="20" high="1000" default="300"/>
+    <number id="timescale" type="slider" arg="--time-scale %"
+            _label="Time compression" _low-label="Real" _high-label="20x"
+            low="1" high="20" default="1"/>
+    <number id="weight" type="slider" arg="--weight %"
+            _label="Aircraft weight (tonnes)" _low-label="300" _high-label="640"
+            low="300" high="640" default="450"/>
+   </vgroup>
+
+   <vgroup>
+    <number id="fov" type="slider" arg="--fov %"
+            _label="Field of view" _low-label="Long lens" _high-label="Wide"
+            low="30" high="100" default="62"/>
+    <number id="bloom" type="slider" arg="--bloom %"
+            _label="Glow" _low-label="None" _high-label="Strong"
+            low="0" high="100" default="40"/>
+    <number id="quality" type="slider" arg="--quality %"
+            _label="Quality (0 = automatic)" _low-label="Auto" _high-label="Best"
+            low="0" high="100" default="0"/>
+    <number id="fps" type="slider" arg="--fps %"
+            _label="Frame rate limit" _low-label="10" _high-label="120"
+            low="10" high="120" default="60"/>
+    <select id="hud">
+      <option id="hudcap"  _label="Captions when the scenery changes"/>
+      <option id="hudoff"  _label="No captions"          arg-set="--hud 0"/>
+      <option id="hudfull" _label="Flight HUD always on" arg-set="--hud 2"/>
+    </select>
+    <select id="units">
+      <option id="metric"   _label="Metric units"/>
+      <option id="imperial" _label="Imperial units" arg-set="--units 1"/>
+    </select>
+    <boolean id="nav"  _label="Navigation lights, beacons and strobes" arg-unset="--no-nav-lights"/>
+    <boolean id="lens" _label="Lens effects (rain on the lens, sun flare)" arg-unset="--no-lens-effects"/>
+   </vgroup>
+  </hgroup>
+
+  <xscreensaver-updater />
+
+  <_description>
+Fly through volumetric clouds on the Antonov An-225 Mriya: 27 weather
+scenarios from clear mornings to night thunderstorms and the aurora, twelve
+cameras bolted to the airframe, a racetrack autopilot, and a procedural
+world below.
+  </_description>
+</screensaver>
