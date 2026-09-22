@@ -414,12 +414,18 @@ static void aim_for_weather(App *a) {
  * jump through a cloud bank). Only while the autopilot is flying. */
 static void place_for_weather(App *a, int first) {
     const Weather *w = &a->ws.cur;
-    if (a->fl.manual) return;
+    /* Out of a jump, whoever is flying: never inside the new ground - a
+     * kilometre clear of it. */
+    if (a->fl.manual) {
+        double g = terrain_max_near(&a->ws.terrain, a->fl.pos.x, a->fl.pos.z, 8000.f);
+        if (a->fl.pos.y < g + 1000.0) flight_teleport_altitude(&a->fl, g + 1000.0);
+        return;
+    }
     double alt = a->fl.pos.y;
     int outside = alt < w->alt_lo || alt > w->alt_hi;
     if (first || outside) alt = w->alt_lo + (w->alt_hi - w->alt_lo) * rng_f(&a->ws.rng);
     double ground = terrain_max_near(&a->ws.terrain, a->fl.pos.x, a->fl.pos.z, 6000.f);
-    if (alt < ground + 700.0) alt = ground + 700.0;
+    if (alt < ground + 1000.0) alt = ground + 1000.0;
     if (alt < 1000.0) alt = 1000.0;
     flight_teleport_altitude(&a->fl, alt);
 }
@@ -436,13 +442,17 @@ static void adapt_quality(App *a, float dt, float budget_ms) {
     a->quality_hold -= dt;
     if (a->quality_hold > 0.f || a->elapsed < 2.0f) return;
     int before = a->quality;
-    if (a->frame_ms > budget_ms * 1.08f)      a->quality -= 8;
-    else if (a->frame_ms < budget_ms * 0.6f)  a->quality += 4;
+    /* A screensaver runs for hours on a machine nobody is using: it aims to
+     * keep the GPU busy for a third to a half of each frame, not all of it -
+     * the difference is a quiet fan and a cool card for a picture that is
+     * hard to tell apart. */
+    if (a->frame_ms > budget_ms * 0.55f)      a->quality -= 6;
+    else if (a->frame_ms < budget_ms * 0.3f)  a->quality += 3;
     a->quality = (int)clampf((float)a->quality, 5.f, 100.f);
     a->quality_hold = 2.f;
     if (a->quality == before) {
         if (!a->quality_saved) {
-            plat_store_write_int("quality-auto", a->quality);
+            plat_store_write_int("quality-auto-v2", a->quality);
             a->quality_saved = 1;
             plat_log("quality settled at %d for %dx%d (%.1f ms/frame, budget %.1f)",
                      a->quality, a->width, a->height, a->frame_ms, budget_ms);
@@ -513,8 +523,10 @@ static void simulate(App *a, float dt) {
                   trails_condensation(a->fl.pos.y, a->ws.cur.humidity) * (1.f - a->ws.passage));
 
     /* captions for whatever just changed */
-    if (a->ws.kind != a->last_weather && a->ws.passage < 0.6f) {
-        a->last_weather = a->ws.kind;
+    /* Named when it has arrived - not when it starts: a change takes a
+     * minute, and the name and the "over ..." must be what is on screen. */
+    if (a->ws.arrived != a->last_weather && a->ws.passage < 0.6f && !a->real) {
+        a->last_weather = a->ws.arrived;
         char sub[128];
         snprintf(sub, sizeof sub, "over %s", terrain_biome_name(a->ws.cur.biome));
         caption(a, settings_scene_title(a->ws.kind), sub);
@@ -622,6 +634,10 @@ int app_run(const AppConfig *cfg) {
     if (!passive(&a) && !SDL_InitSubSystem(SDL_INIT_JOYSTICK))
         plat_log("no joystick support: %s", SDL_GetError());
     int code = 0;
+    /* a log of every real run, so a failure on someone's machine can be told */
+    char logpath[512] = "";
+    if (!passive(&a)) plat_log_default(logpath, sizeof logpath);
+    plat_log("Mriya %s, mode %d", MR_VERSION, (int)cfg->mode);
     if (!init_gl(&a)) { code = 3; goto done; }
     if (cfg->mode == MODE_EMBED && a.width < 640) { a.s.quality = 20; a.s.hud = HUD_OFF; }
 
@@ -629,9 +645,11 @@ int app_run(const AppConfig *cfg) {
     a.quality = a.s.quality > 0 ? a.s.quality : 60;
     if (a.auto_quality) {
         int stored = 0;
-        if (plat_store_read_int("quality-auto", &stored) && stored >= 5 && stored <= 100) a.quality = stored;
+        if (plat_store_read_int("quality-auto-v2", &stored) && stored >= 5 && stored <= 100) a.quality = stored;
     }
+    plat_log("start: OpenGL up, renderer next");
     if (!render_init(&a.r, a.quality)) { code = 4; goto done; }
+    plat_log("start: renderer ready");
     a.r.q = render_quality(a.quality);
     render_resize(&a.r, a.width, a.height);
     if (!hud_init()) { code = 4; goto done; }
@@ -656,7 +674,7 @@ int app_run(const AppConfig *cfg) {
         a.cam.look_pitch = DEG2RAD(cfg->look_pitch);
         a.cam.look_idle = -1e9f;
     }
-    a.last_weather = a.ws.kind;
+    a.last_weather = a.ws.arrived;
     a.last_cam = a.cam.kind;
     a.flight_hud = a.s.hud == HUD_FULL;
     a.help = cfg->show_keys;
@@ -724,6 +742,8 @@ int app_run(const AppConfig *cfg) {
         draw(&a, dt);
         adapt_quality(&a, dt, budget_ms);
         a.frames++;
+        if (a.frames == 1 || a.frames == 2 || a.frames == 10 || a.frames == 120)
+            plat_log("frame %d drawn (gpu %.1f ms, quality %d)", a.frames, a.r.last_frame_ms, a.quality);
         if (cfg->trace && a.frames % 15 == 0)
             plat_log("t=%6.1f pos=(%.0f, %.0f, %.0f) hdg=%5.1f v=%5.1f vs=%+5.1f pitch=%+5.1f bank=%+5.1f n=%.2f thr=%.2f "
                      "ap=%d leg=%.0fkm tgt=%.0f floor=%.0f agl=%.0f wx=%s cam=%s q=%d gpu=%.1fms",
@@ -763,6 +783,19 @@ int app_run(const AppConfig *cfg) {
     plat_log("stop: %d frames in %.2f s (%.1f fps avg), quality=%d, %.1f ms/frame",
              a.frames, a.elapsed, a.elapsed > 0.f ? a.frames / a.elapsed : 0.f, a.quality, a.frame_ms);
 done:
+    /* started for real, and it could not: say why, rather than vanish */
+    if (code >= 3 && code <= 4 && !passive(&a) && !cfg->dump_path) {
+        char msg[1024];
+        const char *why = render_failure();
+        snprintf(msg, sizeof msg,
+                 "Mriya could not start its 3D graphics.\n\n%s\n\n"
+                 "It needs OpenGL 3.3. On a laptop with two graphics chips, choosing the "
+                 "high-performance GPU for Mriya.scr in Windows' graphics settings may help.\n\n"
+                 "Details are in:\n%s",
+                 why ? why : (code == 3 ? "No OpenGL 3.3 context could be created." : "Setting up the renderer failed."),
+                 logpath[0] ? logpath : "(no log)");
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Mriya", msg, a.win);
+    }
     realtime_stop();
     if (a.joy) SDL_CloseJoystick(a.joy);
     hud_shutdown();

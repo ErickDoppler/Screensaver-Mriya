@@ -66,6 +66,7 @@ typedef struct WeatherState {
     int     dealt;                    /* a change began (for weather_update's return) */
     TerrainParams t_from, t_to;       /* the ground the change runs between */
     unsigned world_seed;              /* one terrain for the whole run */
+    int     arrived;                  /* counts changes that have fully arrived */
     /* the passage (a jump): 0 = clear, rises to 1 (inside the cloud) and falls back */
     float   passage;
     int     passage_dir;              /* +1 going in, -1 coming out, 0 none */

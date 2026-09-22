@@ -447,8 +447,9 @@ void weather_init(WeatherState *w, const Settings *s, unsigned seed, int first) 
     w->flash_age = 99.f;
 }
 
-static float passage_rate(int dir) {
-    return dir > 0 ? 1.f / PASSAGE_IN_QUICK : 1.f / PASSAGE_OUT_QUICK;
+static float passage_rate(int dir, int quick) {
+    if (dir > 0) return 1.f / (quick ? PASSAGE_IN_QUICK : PASSAGE_IN);
+    return 1.f / (quick ? PASSAGE_OUT_QUICK : PASSAGE_OUT);
 }
 
 /* The highest the ground would stand near the aircraft under these terrain
@@ -515,17 +516,18 @@ int weather_update(WeatherState *w, const Settings *s, float dt, dvec3 ac) {
     int dealt = w->dealt;
     w->dealt = 0;
 
-    /* A quick change into much higher ground, with the aircraft low, cannot
-     * grow mountains under it in a few seconds: that one is hidden in a cloud
-     * bank instead, as a jump (the app moves the aircraft up inside). */
-    if (dealt && w->quick && w->passage_dir == 0 &&
-        peak_near(&w->t_to, ac) + 700.f > (float)ac.y && peak_near(&w->t_to, ac) > peak_near(&w->t_from, ac) + 500.f) {
+    /* A change that would raise the ground to within a kilometre of the
+     * aircraft cannot grow it round the aircraft: that one is hidden in a
+     * dense cloud bank instead, as a jump - everything switches inside it,
+     * and the app puts the aircraft a kilometre above the new ground. */
+    if (dealt && w->passage_dir == 0 &&
+        peak_near(&w->t_to, ac) + 1000.f > (float)ac.y && peak_near(&w->t_to, ac) > peak_near(&w->t_from, ac) + 200.f) {
         w->passage_dir = 1;
         plat_log("weather: a jump - the new ground is too high to grow under the aircraft");
     }
 
     if (w->passage_dir > 0) {
-        w->passage += dt * passage_rate(1);
+        w->passage += dt * passage_rate(1, w->quick);
         if (w->passage >= 1.f) {
             w->passage = 1.f;
             w->wblend = w->tblend = 1.f;
@@ -533,10 +535,11 @@ int weather_update(WeatherState *w, const Settings *s, float dt, dvec3 ac) {
             w->terrain = w->t_to;
             w->terrain_changed = 1;
             w->passage_dir = -1;
+            w->arrived++;
             dealt |= 2;                             /* place the aircraft now */
         }
     } else if (w->passage_dir < 0) {
-        w->passage -= dt * passage_rate(-1);
+        w->passage -= dt * passage_rate(-1, w->quick);
         if (w->passage <= 0.f) { w->passage = 0.f; w->passage_dir = 0; }
     }
 
@@ -561,6 +564,7 @@ int weather_update(WeatherState *w, const Settings *s, float dt, dvec3 ac) {
         if (w->wblend >= 1.f && w->tblend >= 1.f) {
             w->cur = w->next;
             w->terrain = w->t_to;
+            w->arrived++;
             plat_log("weather: now %s over %s", settings_scene_name(w->kind),
                      terrain_biome_name(w->cur.biome));
         }

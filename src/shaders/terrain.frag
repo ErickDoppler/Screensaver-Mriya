@@ -19,6 +19,7 @@ uniform vec3  uMoonIllum2;
 uniform sampler2D uProbe;
 uniform sampler2D uSkyView;
 uniform sampler2D uCloudShadow;
+uniform float uCSMean;         // the average cloud shadow, past the map
 uniform vec2  uCSCenter;
 uniform float uCSSize;
 uniform float uNight;         // 0 day .. 1 full night: town lights on
@@ -175,8 +176,8 @@ float town(vec2 w, float fp, vec4 T4, out vec3 col, out float lights) {
     vec2 af = fract(r / (block * 5.0));
     vec2 ae = min(af, 1.0 - af) * block * 5.0;
     float arterial = line_mix(min(ae.x, ae.y), 9.0, fp);
-    float patch = smoothstep(0.35, 0.8, f2(w / 420.0, 3, seed + 133u));
-    float far = (0.06 + 0.3 * centre * centre) * patch + arterial * (0.35 + 0.4 * centre);
+    float patchy = smoothstep(0.35, 0.8, f2(w / 420.0, 3, seed + 133u));
+    float far = (0.06 + 0.3 * centre * centre) * patchy + arterial * (0.35 + 0.4 * centre);
     lights = best * mix(lamps, far, saturate(fp / 25.0)) * (0.6 + centre);
     return best;
 }
@@ -307,7 +308,12 @@ void main() {
 
     // cloud shadow: look up where this point's sun ray reaches sea level
     vec2 ref = w - uLightDir.xz / max(uLightDir.y, 0.06) * max(h, 0.0);
-    float cs = texture(uCloudShadow, (ref - uCSCenter) / uCSSize + 0.5).r;
+    vec2 csuv = (ref - uCSCenter) / uCSSize + 0.5;
+    float cs = texture(uCloudShadow, csuv).r;
+    // the map covers only so far: fade to the cover's average before its
+    // edge, where the lookup would smear its border into long straight lines
+    float edge = max(abs(csuv.x - 0.5), abs(csuv.y - 0.5)) * 2.0;
+    cs = mix(cs, uCSMean, smoothstep(0.7, 0.95, edge));
     float shadow = cs * aircraft_shadow(vRel);
 
     vec3 col;

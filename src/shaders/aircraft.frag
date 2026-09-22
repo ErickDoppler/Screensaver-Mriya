@@ -108,6 +108,44 @@ void apply_decals(inout vec3 col, vec3 b, vec3 nb) {
 // itself, dark heat-stained metal glowing faintly at its root. Faint in
 // daylight, a glow at night. The plug is joined to the pylon in the mesh, so
 // it comes with the wing's parts as well as the engines'.
+// Signed distance, metres, from point p to the line through a and b: > 0 on
+// the left of a->b.
+float side_of(vec2 p, vec2 a, vec2 b) {
+    vec2 d = normalize(b - a);
+    return (p - a).x * d.y * -1.0 + (p - a).y * d.x;
+}
+
+// The nacelle swoosh, drawn: a blue wedge from a point high on the cowl's
+// front third, sweeping back and down and widening to a square end near the
+// back; above it, past a white gap, a thin yellow stripe that starts later.
+// Shaped off photographs of the aircraft, on both sides of every nacelle.
+void swoosh(inout vec3 col, vec3 b, vec3 nb) {
+    float ax = abs(b.x);
+    float lipz = ax < 13.6 ? -17.24 : (ax < 20.9 ? -12.435 : -7.59);
+    vec2 axis = vec2(sign(b.x) * (ax < 13.6 ? 9.895 : (ax < 20.9 ? 17.275 : 24.595)),
+                     ax < 13.6 ? -0.296 : (ax < 20.9 ? -0.56 : -0.835));
+    float outward = sign(b.x - axis.x) * nb.x;           // facing out of this side
+    if (outward < 0.15) return;
+    vec2 p = vec2(b.z - lipz, b.y - axis.y);             // along from the lip, up from the axis
+    if (p.x < 1.5 || p.x > 5.2) return;
+    // blue: a point at A, the upper edge to U, the lower edge to L, cut at CUT
+    const vec2 A = vec2(1.82, 0.95), U = vec2(5.0, -0.09), L = vec2(5.04, -0.40);
+    const float CUT = 5.02;
+    // yellow: its top from Y0 to Y1; its bottom the blue's top, raised by GAP
+    const vec2 Y0 = vec2(2.2, 0.85), Y1 = vec2(4.97, 0.13);
+    const float GAP = 0.07;
+    float du = side_of(p, A, U);                         // > 0 above the blue's top
+    float dl = side_of(p, A, L);                         // > 0 above the blue's bottom
+    float dc = CUT - p.x;                                // > 0 forward of the cut
+    float dy = side_of(p, Y0, Y1);                       // > 0 above the yellow's top
+    float w = max(fwidth(p.x) + fwidth(p.y), 0.004) * 0.6;
+    float blu = smoothstep(-w, w, dl) * smoothstep(-w, w, -du) * smoothstep(-w, w, dc);
+    float yel = smoothstep(-w, w, du - GAP) * smoothstep(-w, w, -dy) * smoothstep(-w, w, dc);
+    float fade = smoothstep(0.15, 0.35, outward);
+    col = mix(col, vec3(0.67, 0.55, 0.02), yel * fade);
+    col = mix(col, vec3(0.054, 0.11, 0.33), blu * fade);
+}
+
 void exhaust(inout Surf s, vec3 b, vec3 nb) {
     float ax = abs(b.x);
     float cowl_end = ax < 13.6 ? -12.14 : (ax < 20.9 ? -7.335 : -2.49);
@@ -277,6 +315,7 @@ Surf skin() {
     } else if (part == 2) {
         // nacelles: white, bright metal lips, dark hot sections at the back
         apply_decals(s.albedo, b, nb);
+        swoosh(s.albedo, b, nb);
         float lip = smoothstep(-0.6, -0.9, nb.z);
         s.albedo = mix(s.albedo, vec3(0.8, 0.8, 0.82), lip);
         s.metal = lip;

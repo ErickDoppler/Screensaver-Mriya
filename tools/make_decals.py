@@ -179,7 +179,7 @@ def soften(a, sigma=0.8):
     runs along the true outline, and the shader's edge sharpening then draws
     straight lines and round curves instead of a staircase - which on a fin
     ten metres tall is a staircase of 9 cm steps."""
-    r = 3
+    r = max(3, int(np.ceil(3.0 * sigma)))
     x = np.arange(-r, r + 1, dtype=np.float32)
     k = np.exp(-x * x / (2 * sigma * sigma))
     k /= k.sum()
@@ -193,18 +193,40 @@ def soften(a, sigma=0.8):
     return out
 
 
-def upscale_nearest(arr):
-    return arr.repeat(SCALE, axis=0).repeat(SCALE, axis=1)
+# The swooshes are thin diagonal stripes a few sheet pixels wide: they get
+# more texels, or their edges step even when smoothed.
+SCALE_OF = {"ENG_R": 6, "ENG_L": 6, "FIN_A": 4, "FIN_B": 4}
 
 
-def upscale(arr):
+def upscale_colours(col, a, scale):
+    """The paints, enlarged with smooth boundaries between them. Copying
+    pixels (nearest neighbour) turns the line between the blue and the yellow
+    of a thin diagonal stripe into a staircase; instead each paint's coverage
+    is blurred a little and enlarged smoothly, and every texel takes the paint
+    that covers it most - a boundary that follows the true line."""
+    flat = col.reshape(-1, 3)
+    paints, idx = np.unique(np.round(flat, 4), axis=0, return_inverse=True)
+    idx = idx.reshape(col.shape[:2])
+    h, w = idx.shape
+    best = np.full((h * scale, w * scale), -1.0, np.float32)
+    out = np.zeros((h * scale, w * scale, 3), np.float32)
+    for k, paint in enumerate(paints):
+        m = soften(((idx == k) * np.maximum(a, 0.05)).astype(np.float32), 1.7)
+        m = upscale(m, scale)
+        take = m > best
+        best[take] = m[take]
+        out[take] = paint
+    return out
+
+
+def upscale(arr, scale=SCALE):
     h, w = arr.shape[:2]
     out = []
     chans = arr.shape[2] if arr.ndim == 3 else 1
     for c in range(chans):
         ch = arr[..., c] if arr.ndim == 3 else arr
         img = Image.fromarray(ch.astype(np.float32), mode="F")
-        img = img.resize((w * SCALE, h * SCALE), Image.LANCZOS)
+        img = img.resize((w * scale, h * scale), Image.LANCZOS)
         out.append(np.asarray(img))
     res = np.stack(out, axis=2) if chans > 1 else out[0]
     return np.clip(res, 0.0, 1.0)
@@ -266,8 +288,11 @@ def main():
                 own |= sub == k
         a = a * own
         col = snap(bleed(col, a), allowed)
-        col = upscale_nearest(col)
-        a = upscale(soften(a))
+        scale = SCALE_OF.get(name, SCALE)
+        col = upscale_colours(col, a, scale)
+        # the sheet's edges step a pixel at a time; on the thin stripes a wider
+        # blur puts the half-way contour on the true line, not the steps
+        a = upscale(soften(a, 1.7 if name in SCALE_OF else 0.8), scale)
         # Lanczos rings: flatten the near-solid and near-empty ends, and keep
         # 32 steps across the edge, which is plenty for a rim a few texels wide.
         a = np.where(a > 0.94, 1.0, np.where(a < 0.06, 0.0, a))

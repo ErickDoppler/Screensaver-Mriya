@@ -21,6 +21,19 @@
 /* ------------------------------------------------------------------ log -- */
 static FILE *g_log;
 
+void plat_log_default(char *out, int cap) {
+    out[0] = 0;
+    if (g_log) return;
+    wchar_t dir[MAX_PATH];
+    DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA", dir, MAX_PATH - 32);
+    if (n == 0 || n >= MAX_PATH - 32) return;
+    wcscat(dir, L"\\Mriya");
+    CreateDirectoryW(dir, NULL);
+    wcscat(dir, L"\\last-run.log");
+    g_log = _wfopen(dir, L"w");
+    WideCharToMultiByte(CP_UTF8, 0, dir, -1, out, cap, NULL, NULL);
+}
+
 void plat_log_set_file(const char *path) {
     if (g_log) fclose(g_log);
     g_log = fopen(path, "a");

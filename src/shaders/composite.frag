@@ -8,6 +8,7 @@ out vec4 frag;
 uniform sampler2D uScene;
 uniform sampler2D uDistTex;
 uniform sampler2D uClouds;
+uniform sampler2D uCloudDepth;     // each cloud texel's light-weighted distance
 uniform sampler2D uProbe;
 uniform vec2  uCloudRes;
 uniform vec2  uFullRes;
@@ -53,43 +54,41 @@ vec2 exhaust_shimmer(vec2 uv, float scene_t) {
     return n * s * uHaze * 0.0025;
 }
 
-float min_dist_low(ivec2 lc) {
-    // the conservative distance the cloud pass used for low-res texel lc
-    ivec2 f = ivec2((vec2(lc) + 0.5) * uFullRes / uCloudRes);
-    ivec2 m = ivec2(uFullRes) - 1;
-    float d = texelFetch(uDistTex, min(f, m), 0).r;
-    d = min(d, texelFetch(uDistTex, min(f + ivec2(1, 0), m), 0).r);
-    d = min(d, texelFetch(uDistTex, min(f + ivec2(0, 1), m), 0).r);
-    d = min(d, texelFetch(uDistTex, min(f + ivec2(1, 1), m), 0).r);
-    return d;
-}
 
 void main() {
     float dist0 = texture(uDistTex, vUV).r;
     vec2 uv = vUV + exhaust_shimmer(vUV, dist0);
     vec3 scene = texture(uScene, uv).rgb;
-    float dist = texture(uDistTex, uv).r;
+    vec2 dd = texture(uDistTex, uv).rg;
+    float dist = dd.x;
+    float farf = dd.y;          // the share of an edge pixel that is background
 
+    // The clouds were marched past anything near - the aircraft - to what
+    // lies behind, so every cloud texel holds the cloud behind it too. Here,
+    // per tap, it is laid over this pixel only if that cloud is in front of
+    // what the pixel shows: its depth (the cloud's light-weighted distance)
+    // against the pixel's. Over the aircraft, cloud behind it is left out;
+    // round it, the sky gets its cloud - no halo, at any cloud resolution.
     vec2 lp = uv * uCloudRes - 0.5;
     ivec2 l0 = ivec2(floor(lp));
     vec2 f = lp - vec2(l0);
-    vec4 acc = vec4(0.0);
-    float wsum = 0.0;
     ivec2 lm = ivec2(uCloudRes) - 1;
+    vec4 cl = vec4(0.0);
     for (int y = 0; y <= 1; ++y)
     for (int x = 0; x <= 1; ++x) {
         ivec2 lc = clamp(l0 + ivec2(x, y), ivec2(0), lm);
         float wb = (x == 0 ? 1.0 - f.x : f.x) * (y == 0 ? 1.0 - f.y : f.y);
-        float dl = min_dist_low(lc);
-        // taps that saw a surface much nearer than this pixel (the aircraft,
-        // for a sky pixel beside it) are not to be trusted here
-        float rel = abs(log2(max(dl, 1.0)) - log2(max(dist, 1.0)));
-        float wd = 1.0 / (1.0 + rel * rel * 4.0);
-        float w = wb * wd + 1e-4;
-        acc += texelFetch(uClouds, lc, 0) * w;
-        wsum += w;
+        vec4 ct = texelFetch(uClouds, lc, 0);
+        float cd = max(texelFetch(uCloudDepth, lc, 0).r, 1.0);
+        // in front of the nearest surface in this pixel, or (for an edge's
+        // background share) of whatever is behind it
+        // gradual: inside a cloud the aircraft's far end sits part way into
+        // it, and a hard switch on a noisy depth speckles
+        float rr = dist / cd;
+        float vis = 1.0 - exp(-1.6 * rr * rr);
+        vis = mix(vis, 1.0, farf);
+        cl += mix(vec4(0.0, 0.0, 0.0, 1.0), ct, vis) * wb;
     }
-    vec4 cl = acc / wsum;
     vec3 col = scene * cl.a + cl.rgb;
 
     // the passage: inside a bank of cloud, grey-white and moving past

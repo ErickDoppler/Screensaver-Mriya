@@ -47,24 +47,44 @@ extern const char shader_common_glsl[], shader_atmosphere_glsl[], shader_terrain
 #define SUN_ILLUM 12.f
 #define MOON_FRACTION (1.f / 1500.f)
 
+/* The first reason start-up failed, for the message the user sees. */
+static char g_fail[256];
+static void render_fail(const char *fmt, const char *what) {
+    if (!g_fail[0]) snprintf(g_fail, sizeof g_fail, fmt, what);
+}
+const char *render_failure(void) { return g_fail[0] ? g_fail : NULL; }
+
 /* ------------------------------------------------------------------------ */
 static unsigned compile(GLenum type, const char *const *parts, int n, const char *name) {
     const char *src[16];
     int k = 0;
     src[k++] = "#version 330 core\n";
     for (int i = 0; i < n && k < 16; ++i) src[k++] = parts[i];
+    /* MR_DUMP_SHADERS=<folder>: write each shader as the driver gets it, for
+     * checking with a strict compiler (glslangValidator) */
+    const char *dump = getenv("MR_DUMP_SHADERS");
+    if (dump && *dump) {
+        char path[512];
+        snprintf(path, sizeof path, "%s/%s.%s", dump, name, type == GL_VERTEX_SHADER ? "vert" : "frag");
+        FILE *f = fopen(path, "w");
+        if (f) { for (int i = 0; i < k; ++i) fputs(src[i], f); fclose(f); }
+    }
     unsigned sh = glCreateShader(type);
     glShaderSource(sh, k, src, NULL);
     glCompileShader(sh);
     GLint ok = 0;
     glGetShaderiv(sh, GL_COMPILE_STATUS, &ok);
+    char log[4096];
+    log[0] = 0;
+    glGetShaderInfoLog(sh, sizeof log, NULL, log);
     if (!ok) {
-        char log[4096];
-        glGetShaderInfoLog(sh, sizeof log, NULL, log);
         plat_log("shader %s (%s) failed:\n%s", name, type == GL_VERTEX_SHADER ? "vs" : "fs", log);
+        render_fail("The %s shader did not compile on this graphics driver.", name);
         glDeleteShader(sh);
         return 0;
     }
+    /* warnings too: what one driver lets pass, a stricter one refuses */
+    if (log[0] && log[0] != '\n') plat_log("shader %s (%s) notes:\n%s", name, type == GL_VERTEX_SHADER ? "vs" : "fs", log);
     return sh;
 }
 
@@ -84,6 +104,7 @@ unsigned render_program(const char *const *vs, int nvs, const char *const *fs, i
         char log[4096];
         glGetProgramInfoLog(p, sizeof log, NULL, log);
         plat_log("program %s failed to link:\n%s", name, log);
+        render_fail("The %s shaders did not link on this graphics driver.", name);
         glDeleteProgram(p);
         return 0;
     }
@@ -156,9 +177,22 @@ static void del_fbo(unsigned *f) { if (*f) { glDeleteFramebuffers(1, f); *f = 0;
 Quality render_quality(int setting) {
     float q = clampf(setting / 100.f, 0.f, 1.f);
     Quality o;
-    o.scale = lerpf(0.7f, 1.0f, q);        /* below 70% the picture goes soft */
-    o.cloud_scale = lerpf(0.4f, 0.6f, q);
-    o.cloud_steps = (int)lerpf(56.f, 140.f, q);
+    /* The top two thirds keep the picture sharp (70-100% resolution, full
+     * multisampling) and spend the difference on the clouds; the bottom third
+     * is for integrated graphics, and gives up resolution and samples too. */
+    if (q >= 0.3f) {
+        float t = (q - 0.3f) / 0.7f;
+        o.scale = lerpf(0.7f, 1.0f, t);
+        o.cloud_scale = lerpf(0.45f, 0.6f, t);
+        o.cloud_steps = (int)lerpf(64.f, 140.f, t);
+        o.samples = 4;
+    } else {
+        float t = q / 0.3f;
+        o.scale = lerpf(0.5f, 0.7f, t);
+        o.cloud_scale = lerpf(0.4f, 0.45f, t);
+        o.cloud_steps = (int)lerpf(40.f, 64.f, t);
+        o.samples = q < 0.12f ? 1 : 2;
+    }
     o.shadow_size = setting < 40 ? 1024 : 2048;
     return o;
 }
@@ -184,6 +218,9 @@ static unsigned make_noise3d(Renderer *r, int n, int mode) {
         glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, t, 0, z);
         u1f(r->p_noise, "uZ", ((float)z + 0.5f) / (float)n);
         draw_fullscreen();
+        /* a slow GPU gets the work in small pieces: one long burst can
+         * outlast Windows' two-second GPU watchdog and reset the driver */
+        if ((z & 7) == 7) glFinish();
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glDeleteFramebuffers(1, &fbo);
@@ -248,6 +285,24 @@ static void build_shadow(Renderer *r, int size) {
 int render_init(Renderer *r, int quality) {
     memset(r, 0, sizeof *r);
     r->q = render_quality(quality > 0 ? quality : 60);
+    plat_log("GL %s / %s / %s", (const char *)glGetString(GL_VENDOR), (const char *)glGetString(GL_RENDERER),
+             (const char *)glGetString(GL_VERSION));
+    plat_log("GLSL %s", (const char *)glGetString(0x8B8C /* GL_SHADING_LANGUAGE_VERSION */));
+    {
+        GLint v[8] = { 0 };
+        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &v[0]);
+        glGetIntegerv(0x8073 /* GL_MAX_3D_TEXTURE_SIZE */, &v[1]);
+        glGetIntegerv(0x8B49 /* GL_MAX_FRAGMENT_UNIFORM_COMPONENTS */, &v[2]);
+        glGetIntegerv(0x8B4A /* GL_MAX_VERTEX_UNIFORM_COMPONENTS */, &v[3]);
+        glGetIntegerv(0x8872 /* GL_MAX_TEXTURE_IMAGE_UNITS */, &v[4]);
+        glGetIntegerv(0x8D57 /* GL_MAX_SAMPLES */, &v[5]);
+        glGetIntegerv(0x910E /* GL_MAX_COLOR_TEXTURE_SAMPLES */, &v[6]);
+        glGetIntegerv(0x8824 /* GL_MAX_DRAW_BUFFERS */, &v[7]);
+        plat_log("limits: tex %d, 3D %d, frag uniforms %d, vert uniforms %d, units %d, samples %d / colour %d, draw buffers %d",
+                 v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
+    }
+    plat_log("start: compiling shaders");
+
     const char *C = shader_common_glsl, *A = shader_atmosphere_glsl, *T = shader_terrain_fn_glsl,
                *CL = shader_cloud_fn_glsl;
 
@@ -324,6 +379,7 @@ int render_init(Renderer *r, int quality) {
     r->atmo_key[0] = -1.f;
 
     /* clouds */
+    plat_log("start: shaders done, building cloud noise");
     Uint64 t0 = SDL_GetTicks();
     r->t_noise_base = make_noise3d(r, NOISE_BASE, 0);
     r->t_noise_detail = make_noise3d(r, NOISE_DETAIL, 1);
@@ -364,7 +420,6 @@ int render_init(Renderer *r, int quality) {
     glGenQueries(3, r->gpu_query);
     r->query_ok = 1;
     while (glGetError() != GL_NO_ERROR) {}
-    plat_log("GL %s / %s", (const char *)glGetString(GL_RENDERER), (const char *)glGetString(GL_VERSION));
     gl_check("render_init");
     return 1;
 }
@@ -385,7 +440,8 @@ void render_resize(Renderer *r, int w, int h) {
 }
 
 static void ensure_targets(Renderer *r) {
-    if (r->built_w == r->w && r->built_h == r->h && r->built_cw == r->cw && r->built_ch == r->ch && r->f_scene)
+    if (r->built_w == r->w && r->built_h == r->h && r->built_cw == r->cw && r->built_ch == r->ch && r->f_scene &&
+        r->built_samples == r->q.samples)
         return;
     del_tex(&r->t_scene); del_tex(&r->t_dist); del_fbo(&r->f_scene);
     if (r->rb_depth) { glDeleteRenderbuffers(1, &r->rb_depth); r->rb_depth = 0; }
@@ -397,7 +453,9 @@ static void ensure_targets(Renderer *r) {
     for (int i = 0; i < 2; ++i) { del_tex(&r->t_bloom[i]); del_fbo(&r->f_bloom[i]); }
 
     r->t_scene = make_tex2d(r->w, r->h, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR, GL_CLAMP_TO_EDGE);
-    r->t_dist = make_tex2d(r->w, r->h, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    /* r: the nearest sample's distance; g: how much of the pixel lies well
+     * beyond it (an edge's background share, from the multisample fold) */
+    r->t_dist = make_tex2d(r->w, r->h, GL_RG32F, GL_RG, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
     glGenRenderbuffers(1, &r->rb_depth);
     glBindRenderbuffer(GL_RENDERBUFFER, r->rb_depth);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, r->w, r->h);
@@ -409,6 +467,19 @@ static void ensure_targets(Renderer *r) {
     /* The multisampled scene: four samples a pixel, two past ~1440p where the
      * pixels are small anyway and four would cost half a gigabyte. */
     r->samples = (long)r->w * r->h > 4200000L ? 2 : 4;
+    if (r->q.samples < r->samples) r->samples = r->q.samples;
+    {
+        GLint mx = 0, mc = 0, md = 0;
+        glGetIntegerv(0x910E /* GL_MAX_COLOR_TEXTURE_SAMPLES */, &mc);
+        glGetIntegerv(0x910F /* GL_MAX_DEPTH_TEXTURE_SAMPLES */, &md);
+        glGetIntegerv(0x8D57 /* GL_MAX_SAMPLES */, &mx);
+        int lim = mc;
+        if (mx > 0 && mx < lim) lim = mx;
+        if (lim < 1) lim = 1;
+        if (r->samples > lim) r->samples = lim;
+        if (r->ms_broken) r->samples = 1;
+    }
+    msaa_again:
     glGenTextures(1, &r->t_ms_color);
     glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, r->t_ms_color);
     glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, r->samples, GL_RGBA16F, r->w, r->h, GL_TRUE);
@@ -428,7 +499,21 @@ static void ensure_targets(Renderer *r) {
         GLenum b[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
         glDrawBuffers(2, b);
     }
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) plat_log("multisampled scene target incomplete");
+    {
+        GLenum st = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if (st != GL_FRAMEBUFFER_COMPLETE) {
+            plat_log("multisampled scene target incomplete (0x%x) at %d samples", (unsigned)st, r->samples);
+            if (r->samples > 1) {
+                /* fewer samples, down to one: the scene still renders */
+                del_tex(&r->t_ms_color); del_tex(&r->t_ms_dist); del_fbo(&r->f_ms);
+                glDeleteRenderbuffers(1, &r->rb_ms_depth); r->rb_ms_depth = 0;
+                r->samples = r->samples > 2 ? 2 : 1;
+                if (r->samples == 1) r->ms_broken = 1;
+                goto msaa_again;
+            }
+        }
+        plat_log("scene: %d samples", r->samples);
+    }
 
     r->t_comp = make_tex2d(r->w, r->h, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR, GL_CLAMP_TO_EDGE);
     r->f_comp = make_fbo(r->t_comp, 0);
@@ -453,6 +538,7 @@ static void ensure_targets(Renderer *r) {
         r->f_bloom[i] = make_fbo(r->t_bloom[i], 0);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    r->built_samples = r->q.samples;
     r->built_w = r->w; r->built_h = r->h; r->built_cw = r->cw; r->built_ch = r->ch;
     plat_log("targets: scene %dx%d, clouds %dx%d", r->w, r->h, r->cw, r->ch);
 }
@@ -902,6 +988,11 @@ void render_frame(Renderer *r, const Frame *f) {
         u3v(p, "uMoonIllum2", L.fill_illum);
         u2f(p, "uCSCenter", csx, csz);
         u1f(p, "uCSSize", CSHADOW_SIZE);
+        /* past the shadow map, the cloud cover's average shadow */
+        {
+            float cov = fmaxf(w->low.cover * fminf(w->low.density, 1.5f), w->mid.cover * 0.6f);
+            u1f(p, "uCSMean", 1.f - 0.55f * clampf(cov, 0.f, 1.f));
+        }
         u1f(p, "uNight", L.night);
         u1f(p, "uCityLights", w->city_lights * L.pre * 0.4f);
         u1f(p, "uWetness", w->wetness);
@@ -1048,6 +1139,8 @@ void render_frame(Renderer *r, const Frame *f) {
         set_cloud_tex(p, r, 4);
         tex(p, "uDistTex", 7, GL_TEXTURE_2D, r->t_dist);
         tex(p, "uProbe", 8, GL_TEXTURE_2D, r->t_probe);
+        /* the aircraft: 45 m round its middle, however far the camera is */
+        u1f(p, "uAircraftReach", v3_len(ac_rel) + 48.f);
         um3(p, "uCamBasis", f->cam_basis);
         u2f(p, "uTanHalf", th * aspect, th);
         u2f(p, "uFullRes", (float)r->w, (float)r->h);
@@ -1110,6 +1203,7 @@ void render_frame(Renderer *r, const Frame *f) {
         tex(p, "uScene", 0, GL_TEXTURE_2D, r->t_scene);
         tex(p, "uDistTex", 1, GL_TEXTURE_2D, r->t_dist);
         tex(p, "uClouds", 2, GL_TEXTURE_2D, r->t_hist[r->hist_idx]);
+        tex(p, "uCloudDepth", 5, GL_TEXTURE_2D, r->t_hdepth[r->hist_idx]);
         tex(p, "uProbe", 3, GL_TEXTURE_2D, r->t_probe);
         u2f(p, "uCloudRes", (float)r->cw, (float)r->ch);
         u2f(p, "uFullRes", (float)r->w, (float)r->h);

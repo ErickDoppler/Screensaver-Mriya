@@ -15,6 +15,11 @@
 /* ------------------------------------------------------------------ log -- */
 static FILE *g_log;
 
+void plat_log_default(char *out, int cap) {
+    out[0] = 0;
+    (void)cap;
+}
+
 void plat_log_set_file(const char *path) {
     if (g_log) fclose(g_log);
     g_log = fopen(path, "a");

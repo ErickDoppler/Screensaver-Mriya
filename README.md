@@ -101,6 +101,14 @@ To look at it before installing, build with
 `build\win-mingw\Mriya.scr /w` for a window or `/s` for fullscreen. `Esc`
 always exits.
 
+#### It does not start, or something looks wrong
+
+Every run writes a log to `%LOCALAPPDATA%\Mriya\last-run.log`: the graphics
+card and driver, each start-up step, and the frame times. If it cannot start
+its 3D graphics it says so in a message box that names the reason. On a laptop
+with two graphics chips it runs on either; attach the log to an issue if it
+misbehaves on yours.
+
 #### Nothing happens on idle
 
 The screensaver is whatever `SCRNSAVE.EXE` under `HKCU\Control Panel\Desktop`

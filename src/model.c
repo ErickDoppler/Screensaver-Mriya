@@ -196,8 +196,8 @@ int model_livery(Decal *out, int cap) {
     for (int s = -1; s <= 1; s += 2)
         for (int e = 0; e < 3; ++e) {
             float xc = ex[e] * (float)s;
-            put(out, &n, cap, DECAL_ENG_R, ez[e], ey[e], 3.6f, 0.f, +1.f, PART_ENGINE, xc, 2.2f, 0.f);
-            put(out, &n, cap, DECAL_ENG_L, ez[e], ey[e], 3.6f, 0.f, -1.f, PART_ENGINE, xc, 2.2f, 0.f);
+            /* (the swoosh itself is drawn in aircraft.frag, crisp) */
+            (void)xc; (void)ez; (void)ey;
         }
     /* the registration under the left wing, at 79% of the span and mid
      * chord as on the AN225.fbx model, letter tops toward the leading edge */

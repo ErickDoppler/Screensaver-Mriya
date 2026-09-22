@@ -12,6 +12,7 @@ layout(location = 1) out vec4 fragDepth;
 uniform mat3  uCamBasis;
 uniform vec2  uTanHalf;
 uniform sampler2D uDistTex;     // scene distance, metres (sky: huge)
+uniform float uAircraftReach;   // nearer than this is the aircraft: march past it
 uniform sampler2D uProbe;
 uniform vec2  uFullRes;         // size of the distance texture
 uniform float uFrame;
@@ -102,10 +103,15 @@ void main() {
     // the full-res pixels it covers)
     vec2 fp = vUV * uFullRes;
     ivec2 ip = ivec2(fp);
+    // March to the farthest surface in this texel's footprint, and past the
+    // aircraft altogether: the composite decides per pixel whether a cloud
+    // is in front of what it shows (see composite.frag).
+    ivec2 mx = ivec2(uFullRes) - 1;
     float scene_t = texelFetch(uDistTex, ip, 0).r;
-    scene_t = min(scene_t, texelFetch(uDistTex, min(ip + ivec2(1, 0), ivec2(uFullRes) - 1), 0).r);
-    scene_t = min(scene_t, texelFetch(uDistTex, min(ip + ivec2(0, 1), ivec2(uFullRes) - 1), 0).r);
-    scene_t = min(scene_t, texelFetch(uDistTex, min(ip + ivec2(1, 1), ivec2(uFullRes) - 1), 0).r);
+    scene_t = max(scene_t, texelFetch(uDistTex, min(ip + ivec2(1, 0), mx), 0).r);
+    scene_t = max(scene_t, texelFetch(uDistTex, min(ip + ivec2(0, 1), mx), 0).r);
+    scene_t = max(scene_t, texelFetch(uDistTex, min(ip + ivec2(1, 1), mx), 0).r);
+    if (scene_t < uAircraftReach) scene_t = 1e7;
 
     vec4 ci = cirrus(rd, scene_t);
     bool cirrus_behind = uCamWorld.y < uCirrus.y;

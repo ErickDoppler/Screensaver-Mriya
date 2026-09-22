@@ -21,6 +21,10 @@ int plat_clipboard_image(const unsigned char *rgba, int w, int h);
 /* Diagnostics. Goes to the debugger/stderr and, if enabled, a log file. */
 void plat_log_set_file(const char *path);
 void plat_log(const char *fmt, ...);
+/* Starts a fresh log of this run in the user's data folder (Windows:
+ * %LOCALAPPDATA%\Mriya\last-run.log) unless a log file was already given.
+ * Writes the path into out. */
+void plat_log_default(char *out, int cap);
 
 #ifdef _WIN32
 /* Bounding box of all monitors, in virtual-screen pixels. */

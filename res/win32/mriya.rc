@@ -150,8 +150,8 @@ BEGIN
 END
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,0,0
- PRODUCTVERSION 1,0,0,0
+ FILEVERSION 1,1,0,0
+ PRODUCTVERSION 1,1,0,0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS VOS_NT_WINDOWS32
@@ -164,13 +164,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Andrii Kamlyk"
             VALUE "FileDescription", "Mriya screensaver"
-            VALUE "FileVersion", "1.0.0.0"
+            VALUE "FileVersion", "1.1.0.0"
             VALUE "InternalName", "Mriya"
             VALUE "LegalCopyright", "Copyright (c) 2026 Andrii Kamlyk. MIT License."
             VALUE "Comments", "OpenGL screensaver: flying the An-225 Mriya through the weather. Open source."
             VALUE "OriginalFilename", "Mriya.scr"
             VALUE "ProductName", "Mriya"
-            VALUE "ProductVersion", "1.0.0.0"
+            VALUE "ProductVersion", "1.1.0.0"
         END
     END
     BLOCK "VarFileInfo"

@@ -28,6 +28,7 @@ typedef struct Quality {
     float cloud_scale;     /* cloud resolution, fraction of the main */
     int   cloud_steps;
     int   shadow_size;
+    int   samples;         /* multisampling of the scene: 4, 2 or 1 */
 } Quality;
 
 /* Everything the renderer needs to know about the world this frame. */
@@ -95,6 +96,8 @@ typedef struct Renderer {
      * and folded into t_scene / t_dist (msresolve.frag) */
     unsigned f_ms, t_ms_color, t_ms_dist, rb_ms_depth;
     int      samples;
+    int      ms_broken;        /* multisampling did not work: single sample */
+    int      built_samples;
     int      ldr_w, ldr_h;
     unsigned t_lum, f_lum, t_adapt[2], f_adapt[2];
     int      adapt_idx, adapt_reset, lum_levels;
@@ -120,6 +123,8 @@ void render_resize(Renderer *r, int w, int h);
 void render_frame(Renderer *r, const Frame *f);
 void render_shutdown(Renderer *r);
 int  render_dump_png(const Renderer *r, const char *path);
+/* Why render_init failed, in words for the user (NULL if it did not). */
+const char *render_failure(void);
 /* The frame on screen as RGBA, top row first (malloc'd; the caller frees),
  * and a PNG writer for it. */
 unsigned char *render_read_rgba(const Renderer *r, int *w, int *h);
