@@ -43,8 +43,11 @@ float height_profile(float h, float type) {
     return mix(mix(stratus, cumulus, a), cb, b);
 }
 
+// `detail` is how much of the fine erosion to apply, 0 to 1: a hard switch
+// between on and off draws a visible ring round the camera where the tone
+// changes, so it is faded with distance instead.
 float layer_density(vec3 air3, float alt, vec4 l0, vec4 l1, float cover_map,
-                    float height_map, bool detail) {
+                    float height_map, float detail) {
     float base = l0.x, top = l0.y, type = l0.w;
     // each cloud reaches its own height: cumulus towers do not end flat
     float local_top = base + (top - base) * (type < 0.3 ? 1.0 : mix(0.35, 1.0, height_map));
@@ -66,19 +69,19 @@ float layer_density(vec3 air3, float alt, vec4 l0, vec4 l1, float cover_map,
     // sky erodes to nothing
     shape = saturate(remap(shape, 1.0 - cover, 1.0, 0.0, 1.0));
     if (shape <= 0.0) return 0.0;
-    if (detail) {
+    if (detail > 0.001) {
         vec3 dn = texture(uNoiseDetail, air3 / (scale * 0.11) + vec3(0.0, uTime * 0.004, 0.0)).rgb;
         float dfbm = dn.r * 0.625 + dn.g * 0.25 + dn.b * 0.125;
         // wispy underneath, cauliflower on top
         float mod_ = mix(dfbm, 1.0 - dfbm, saturate(h * 6.0));
-        shape = saturate(remap(shape, mod_ * l1.z * 0.9, 1.0, 0.0, 1.0));
+        shape = saturate(remap(shape, mod_ * l1.z * 0.9 * detail, 1.0, 0.0, 1.0));
     }
     return shape * l1.x * 2.2;
 }
 
-// Density at a camera-relative point. `detail` false is the cheap version
-// the light march uses.
-float cloud_density(vec3 prel, bool detail, out float hfrac) {
+// Density at a camera-relative point. `detail` 0 is the cheap version the
+// light march uses; between 0 and 1 the fine erosion fades in.
+float cloud_density(vec3 prel, float detail, out float hfrac) {
     float alt = altitude_of(prel);
     vec2 air = uCamWorld.xz + prel.xz - uAirOffset;
     vec4 w = weather_at(air);

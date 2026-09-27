@@ -28,11 +28,11 @@ void main() {
         for (int k = 0; k < 28; ++k) {
             float dt = 25.0 + t * 0.12;
             vec3 p = uAcRel + uLightDir * (t + dt * 0.5);
-            od += cloud_density(p, k < 8, hf) * CLOUD_EXT * dt;
+            od += cloud_density(p, k < 8 ? 1.0 : 0.0, hf) * CLOUD_EXT * dt;
             t += dt;
             if (t > 25000.0) break;
         }
-        float inside = cloud_density(vec3(0.0), true, hf);
+        float inside = cloud_density(vec3(0.0), 1.0, hf);
         vec2 air = uCamWorld.xz - uAirOffset;
         float rain = weather_at(air).a;
         rain *= smoothstep(uLow0.y, uLow0.y * 0.6 + uLow0.x * 0.4, uCamWorld.y);

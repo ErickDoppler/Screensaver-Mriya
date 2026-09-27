@@ -474,7 +474,9 @@ void flight_update(Flight *f, const Settings *s, const TerrainParams *t,
         {
             float k = (float)((2.0 * MR_PI_D * 0.9) * (2.0 * MR_PI_D * 0.9));
             float c = 2.f * 0.08f * sqrtf(k);
-            float target = (float)(n_eff - 1.0) * 2.4f;
+            /* 0.6 m at the tip per g: the Mriya's wing is stiffer than it
+             * looks, and the deflection is a quarter of what it was */
+            float target = (float)(n_eff - 1.0) * 0.6f;
             float acc = k * (target - f->flex) - c * f->flex_v;
             f->flex_v += acc * (float)dt;
             f->flex += f->flex_v * (float)dt;

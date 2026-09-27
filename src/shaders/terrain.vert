@@ -16,13 +16,25 @@ out float vH;
 
 void main() {
     vec2 g = aGrid;
-    vec2 c = abs(g - uGridN * 0.5) / (uGridN * 0.5);
-    float m = smoothstep(0.66, 0.9, max(c.x, c.y));
+    // How far out this vertex is, measured from the camera itself and in the
+    // square metric the levels are laid out in. Taken from the grid instead,
+    // it is measured from the level's snapped origin, which moves in whole
+    // steps - and then the blend below, and the detail, jump with it.
+    vec2 rel0 = uOriginRel + g * uSpacing;
+    float half_ext = uGridN * 0.5 * uSpacing;
+    float cheb = max(abs(rel0.x), abs(rel0.y));
+    float m = smoothstep(0.66, 0.9, cheb / half_ext);
     vec2 gm = g - mod(g, 2.0) * m;
     vec2 world = uOriginWorld + gm * uSpacing;
     vec2 rel = uOriginRel + gm * uSpacing;
-    float h = terrain_height(world, uSpacing * mix(2.0, 4.0, m));
     float d2 = dot(rel, rel);
+    // How fine the ground may be here: from the same distance, so it too
+    // moves smoothly. 8 / gridN reproduces exactly the detail each level had
+    // (a level spans 32 to 64 of its own spacings out from the camera, so
+    // this is 2 x spacing at its inner edge and 4 x at its rim), and two
+    // neighbouring levels work out the same value along their shared edge.
+    float mw = max(cheb * 8.0 / uGridN, uSpacing * 2.0);
+    float h = terrain_height(world, mw);
     // the earth curves away: a point 100 km off sits 785 m lower
     float y = max(h, 0.0) - uCamWorld.y - d2 / (2.0 * EARTH_R);
     vRel = vec3(rel.x, y, rel.y);

@@ -238,13 +238,21 @@ vec3 land_albedo_b(vec2 w, float h, vec3 n, float fp, int biome, vec4 T3, vec4 T
         c = mix(c, tc, built * 0.9);
         emissive = lights * (1.0 - shore);
     }
-    // snow: the snow line, the season, flat ground holding more than steep
-    float sline = T3.x + (n2(w / 1500.0, seed + 29u) - 0.5) * 500.0;
+    // Snow: the snow line, the season, flat ground holding more than steep.
+    // The line wanders at two scales - a few kilometres, and tens of them,
+    // so one range keeps its snow while the next has lost most of it. Even
+    // above it the cover is patchy, or distant peaks read as white cut-outs.
+    float sline = T3.x + (n2(w / 1500.0, seed + 29u) - 0.5) * 500.0
+                       + (n2(w / 14000.0, seed + 33u) - 0.5) * 900.0;
     snow_amt = smoothstep(sline - 150.0, sline + 150.0, h);
     snow_amt = max(snow_amt, T4.w);
     snow_amt *= 1.0 - smoothstep(0.45, 0.75, slope);
     snow_amt *= 1.0 - forest_mask * 0.6;
-    c = mix(c, vec3(0.8, 0.83, 0.87), snow_amt);
+    snow_amt *= 0.62 + 0.38 * n2(w / 5200.0, seed + 34u);
+    // the snow itself is not one white: wind-scoured and shaded fields differ
+    vec3 snow_c = mix(vec3(0.74, 0.78, 0.84), vec3(0.86, 0.88, 0.91),
+                      n2(w / 2600.0, seed + 35u));
+    c = mix(c, snow_c, snow_amt);
     // wet ground is darker
     c *= 1.0 - uWetness * 0.25 * (1.0 - snow_amt);
     return c;

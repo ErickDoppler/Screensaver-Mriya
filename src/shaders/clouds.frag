@@ -64,7 +64,7 @@ vec2 slab(vec3 rd) {
 float light_march(vec3 p, vec3 L) {
     float od = 0.0, t = 0.0, dt = 40.0, hf;
     for (int i = 0; i < 6; ++i) {
-        od += cloud_density(p + L * (t + dt * 0.5), false, hf) * dt;
+        od += cloud_density(p + L * (t + dt * 0.5), 0.0, hf) * dt;
         t += dt;
         dt *= 1.9;
     }
@@ -144,8 +144,13 @@ void main() {
             float dt = (t + C) * k;
             vec3 p = rd * (t + dt * 0.5);
             float hf;
-            // the fine detail only where a pixel can hold it
-            float d = cloud_density(p, t < 25000.0, hf);
+            // the fine detail fades out with distance rather than stopping
+            // at a line, which would ring the camera in a change of tone
+            float d = cloud_density(p, smoothstep(45000.0, 15000.0, t), hf);
+            // and the deck itself thins away over the last quarter of the
+            // march: stopping at the limit leaves its far edge as a hard
+            // stepped line across the sky
+            d *= smoothstep(uMaxDist, uMaxDist * 0.72, t);
             float rd_ = rain_density(p);
             if (d > 0.0 || rd_ > 0.0) {
                 float sigma = d * CLOUD_EXT + rd_;

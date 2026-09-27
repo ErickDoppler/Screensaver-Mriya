@@ -98,6 +98,7 @@ typedef struct Renderer {
     int      samples;
     int      ms_broken;        /* multisampling did not work: single sample */
     int      built_samples;
+    float    terrain_s0;       /* the grid's finest spacing, held across frames */
     int      ldr_w, ldr_h;
     unsigned t_lum, f_lum, t_adapt[2], f_adapt[2];
     int      adapt_idx, adapt_reset, lum_levels;

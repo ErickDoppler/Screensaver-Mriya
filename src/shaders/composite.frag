@@ -22,7 +22,8 @@ uniform vec3  uPlumeDir;        // aft, along the exhaust
 uniform float uHaze;            // how hard the hot exhaust shimmers
 
 // Heat shimmer: where the line of sight crosses a hot exhaust plume in front
-// of what is behind it, the picture wobbles. Each plume is a cone 50 m long.
+// of what is behind it, the picture wobbles. Each plume is a 15 degree cone
+// that has spread and cooled into the air by the tailplane, 36 m back.
 vec2 exhaust_shimmer(vec2 uv, float scene_t) {
     if (uHaze <= 0.0) return vec2(0.0);
     vec2 ndc = uv * 2.0 - 1.0;
@@ -38,20 +39,27 @@ vec2 exhaust_shimmer(vec2 uv, float scene_t) {
         if (den < 1e-4) continue;
         float tr = (b * e - d) / den;       // along the ray
         float tp = (e - b * d) / den;       // along the plume
-        tp = clamp(tp, 0.0, 50.0);
+        tp = clamp(tp, 0.0, 40.0);
         vec3 pp = a + uPlumeDir * tp;
         tr = dot(pp, rd);
         if (tr <= 0.0 || tr > scene_t) continue;
         float dist = length(rd * tr - pp);
-        float rad = 0.7 + tp * 0.045;
-        float k = saturate(1.0 - dist / rad) * exp(-tp / 22.0) * smoothstep(0.0, 1.5, tp);
+        // a 15 degree cone: tan(7.5 degrees) either side of the axis
+        float rad = 0.7 + tp * 0.1317;
+        // and gone by the tailplane, where the plume has mixed away
+        float k = saturate(1.0 - dist / rad) * exp(-tp / 22.0) *
+                  smoothstep(0.0, 1.5, tp) * smoothstep(36.0, 16.0, tp);
         s += k;
     }
     if (s <= 0.0) return vec2(0.0);
-    vec2 q = uv * vec2(90.0, 60.0);
+    // fine, close-packed ripples: hot air shears into small cells, not the
+    // long slow waves this had
+    vec2 q = uv * vec2(900.0, 600.0);
     vec2 n = vec2(sin(q.y + uTime * 23.0 + sin(q.x * 0.7 + uTime * 11.0)),
                   cos(q.x * 1.3 - uTime * 19.0 + sin(q.y * 0.9)));
-    return n * s * uHaze * 0.0025;
+    // barely there: hot exhaust bends the light very little, and a shimmer
+    // you can plainly see reads as a rendering artefact
+    return n * s * uHaze * 0.00025;
 }
 
 
@@ -91,14 +99,12 @@ void main() {
     }
     vec3 col = scene * cl.a + cl.rgb;
 
-    // the passage: inside a bank of cloud, grey-white and moving past
+    // the passage: inside a bank of cloud, grey-white and even
     if (uPassage > 0.0) {
         vec3 amb = texelFetch(uProbe, ivec2(1, 0), 0).rgb * 0.8 +
                    texelFetch(uProbe, ivec2(3, 0), 0).rgb * 0.14;
-        vec2 c = vUV - 0.5;
-        float r = length(c);
-        float swirl = 0.5 + 0.5 * sin(r * 30.0 - uTime * 6.0 + atan(c.y, c.x) * 3.0);
-        float fog = saturate(uPassage * 1.15) * mix(0.9, 1.0, swirl * uPassage);
+        // cloud closing in and thinning out again: plain fog, no pattern
+        float fog = smoothstep(0.0, 1.0, saturate(uPassage * 1.12));
         col = mix(col, amb, fog);
     }
     col += vec3(0.7, 0.75, 1.0) * uFlashScreen;

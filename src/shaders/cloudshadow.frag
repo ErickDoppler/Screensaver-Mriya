@@ -22,7 +22,7 @@ void main() {
     for (int i = 0; i < N; ++i) {
         float hf;
         vec3 p = prel + L * (t0 + (float(i) + 0.5) * dt);
-        od += cloud_density(p, false, hf) * CLOUD_EXT * dt;
+        od += cloud_density(p, 0.0, hf) * CLOUD_EXT * dt;
         od += rain_density(p) * dt;
     }
     // a real cloud's shadow is never pitch black: light scatters round it

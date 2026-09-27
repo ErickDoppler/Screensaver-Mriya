@@ -5,7 +5,7 @@
 #include "mathx.h"
 
 #define TRAIL_ENGINES 6
-#define TRAIL_SAMPLES 480          /* 72 s at one sample every 0.15 s */
+#define TRAIL_SAMPLES 720          /* 108 s at one sample every 0.15 s */
 #define TRAIL_STEP 0.15f
 
 /* Engine nozzles in the body frame: the aft end of each nacelle on its axis. */

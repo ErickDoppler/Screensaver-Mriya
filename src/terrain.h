@@ -64,6 +64,13 @@ typedef struct TerrainGrid {
 } TerrainGrid;
 
 /* Lays the levels out around the camera. `agl` (height above the ground)
- * picks the finest spacing, and levels are added until they reach `reach`. */
-void terrain_grid_layout(TerrainGrid *g, double cam_x, double cam_z, float agl, float reach);
+ * picks the finest spacing, and levels are added until they reach `reach`.
+ *
+ * `s0_state` carries the finest spacing from frame to frame (start it at 0).
+ * Changing it re-lays every level at once, and the whole landscape is then
+ * sampled on a different lattice - distant ridges visibly change shape - so
+ * it is held until the height is well past the point of changing it, and
+ * never flips back and forth while flying near one. */
+void terrain_grid_layout(TerrainGrid *g, double cam_x, double cam_z, float agl, float reach,
+                         float *s0_state);
 #endif

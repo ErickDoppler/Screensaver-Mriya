@@ -967,7 +967,8 @@ void render_frame(Renderer *r, const Frame *f) {
     glDepthFunc(GL_LESS);
     {
         TerrainGrid g;
-        terrain_grid_layout(&g, f->cam_pos.x, f->cam_pos.z, fmaxf(f->agl, 50.f), TERRAIN_REACH);
+        terrain_grid_layout(&g, f->cam_pos.x, f->cam_pos.z, fmaxf(f->agl, 50.f), TERRAIN_REACH,
+                            &r->terrain_s0);
         unsigned p = r->p_terrain;
         glUseProgram(p);
         set_atmo(p, w);
@@ -1284,59 +1285,82 @@ void render_frame(Renderer *r, const Frame *f) {
             glEnable(GL_DEPTH_TEST);
         }
     }
-    /* contrails */
+    /* Contrails: one continuous ribbon per engine. Drawn as separate quads,
+     * each segment's own facing and width showed as a seam and a kink at
+     * every join; a strip shares its vertices, so the edge runs smoothly the
+     * whole way back. */
     if (f->trails && f->trails->count > 1) {
-        static float tv[TRAIL_SAMPLES * TRAIL_ENGINES * 10];
+        static float tv[(TRAIL_SAMPLES + 1) * 2 * 8];
+        static vec3 pts[TRAIL_SAMPLES + 1];
+        static float ages[TRAIL_SAMPLES + 1], ops[TRAIL_SAMPLES + 1];
         const Trails *t = f->trails;
-        int n = 0;
+        unsigned p = r->p_trail;
+        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        glUseProgram(p);
+        um4(p, "uViewProj", &vp_ac);
+        tex(p, "uProbe", 0, GL_TEXTURE_2D, r->t_probe);
+        u3v(p, "uLightDir", L.key_dir);
+        u1f(p, "uTime", f->time);
+        glBindBuffer(GL_ARRAY_BUFFER, r->trail_vbo);
+        for (int a = 0; a < 3; ++a) glEnableVertexAttribArray((GLuint)a);
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 32, (void *)0);
+        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 32, (void *)16);
+        glDisableVertexAttribArray(2);
         for (int e = 0; e < TRAIL_ENGINES; ++e) {
-            /* newest to oldest; the first segment starts at the nozzle itself */
-            vec3 prev = v3_add(ac_rel, basis_apply(f->ac_basis, trail_nozzle[e]));
-            float prev_age = 0.f;
+            /* newest to oldest, starting at the nozzle itself */
+            int m = 0;
+            pts[m] = v3_add(ac_rel, basis_apply(f->ac_basis, trail_nozzle[e]));
+            ages[m] = 0.f; ops[m] = 0.f; m++;
             for (int k = 0; k < t->count; ++k) {
                 int i = (t->head - 1 - k + TRAIL_SAMPLES * 2) % TRAIL_SAMPLES;
                 dvec3 wpos = dv3_add(t->air[i][e], f->wind_off);
                 vec3 cur = dv3_to_v3(dv3_sub(wpos, f->cam_pos));
                 float age = f->time - t->born[i];
-                /* condensation starts a few tens of metres back, the trail
-                 * spreads with age and thins out over a minute */
-                float op = t->strength[i] * smoothstepf(0.08f, 0.6f, age) * (1.f - smoothstepf(20.f, 70.f, age));
-                float wd = 0.9f + sqrtf(age) * 1.3f;
-                if (op > 0.003f) {
-                    float *o = tv + n * 10;
-                    o[0] = prev.x; o[1] = prev.y; o[2] = prev.z; o[3] = wd;
-                    o[4] = cur.x; o[5] = cur.y; o[6] = cur.z; o[7] = op * 0.9f;
-                    o[8] = prev_age; o[9] = age;
+                /* The wake sinks: the wing's vortex pair carries it down.
+                 * And it wanders: the air it hangs in is never still, so an
+                 * old trail is a slowly waving rope, not a ruled line. */
+                cur.y -= 0.22f * age;
+                {
+                    float wob = 0.9f * age;
+                    float ph = age * 0.55f + (float)e * 2.1f;
+                    cur.x += wob * (sinf(ph) * 0.6f + sinf(ph * 2.7f + 1.1f) * 0.25f);
+                    cur.y += wob * (sinf(ph * 1.7f + 4.3f) * 0.45f + sinf(ph * 3.9f) * 0.2f);
+                    cur.z += wob * sinf(ph * 2.3f + 2.2f) * 0.3f;
+                }
+                /* nothing for the first stretch behind the nozzle - the
+                 * exhaust is too hot to condense, the gap in every photo -
+                 * then a dense core that takes a minute and a half to go */
+                float op = t->strength[i] * smoothstepf(0.3f, 1.1f, age) *
+                           (1.f - smoothstepf(45.f, 105.f, age));
+                pts[m] = cur; ages[m] = age; ops[m] = op; m++;
+            }
+            if (m < 3) continue;
+            int n = 0;
+            for (int i = 0; i < m; ++i) {
+                vec3 a0 = pts[i > 0 ? i - 1 : 0], a1 = pts[i + 1 < m ? i + 1 : m - 1];
+                vec3 dir = v3_norm(v3_sub(a1, a0));
+                vec3 side = v3_cross(dir, pts[i]);
+                float sl = v3_len(side);
+                side = sl > 1e-4f ? v3_scale(side, 1.f / sl) : v3(1.f, 0.f, 0.f);
+                /* Spreading: about a metre a second, so a minute-old trail
+                 * is some sixty metres across - wide enough on screen for
+                 * its billows to be seen, and still narrow enough that the
+                 * six stay separate for kilometres. */
+                float wd = 2.2f + 0.95f * ages[i];
+                for (int s = 0; s < 2; ++s) {
+                    float sg = s == 0 ? -1.f : 1.f;
+                    vec3 v = v3_add(pts[i], v3_scale(side, wd * sg));
+                    float *o = tv + n * 8;
+                    o[0] = v.x; o[1] = v.y; o[2] = v.z; o[3] = sg;
+                    o[4] = ages[i]; o[5] = ops[i]; o[6] = (float)e; o[7] = wd;
                     n++;
                 }
-                prev = cur;
-                prev_age = age;
             }
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(sizeof(float) * 8 * (size_t)n), tv, GL_STREAM_DRAW);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, n);
         }
-        if (n > 0) {
-            unsigned p = r->p_trail;
-            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-            glUseProgram(p);
-            um4(p, "uViewProj", &vp_ac);
-            tex(p, "uProbe", 0, GL_TEXTURE_2D, r->t_probe);
-            u3v(p, "uLightDir", L.key_dir);
-            u1f(p, "uTime", f->time);
-            glBindBuffer(GL_ARRAY_BUFFER, r->trail_vbo);
-            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(sizeof(float) * 10 * (size_t)n), tv, GL_STREAM_DRAW);
-            for (int a = 0; a < 3; ++a) {
-                glEnableVertexAttribArray((GLuint)a);
-                glVertexAttribDivisor((GLuint)a, 1);
-            }
-            glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 40, (void *)0);
-            glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 40, (void *)16);
-            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 40, (void *)32);
-            glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, n);
-            for (int a = 0; a < 3; ++a) {
-                glVertexAttribDivisor((GLuint)a, 0);
-                glDisableVertexAttribArray((GLuint)a);
-            }
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-        }
+        for (int a = 0; a < 2; ++a) glDisableVertexAttribArray((GLuint)a);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
     /* the navigation lights */
     if (f->nav_lights) {

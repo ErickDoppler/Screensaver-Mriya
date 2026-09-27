@@ -104,8 +104,14 @@ float height_one(vec2 xz, float minWave, vec4 T0, vec4 T1, vec4 T2) {
     if (T1.y > 0.0) {
         float mscale = T1.z * 1000.0;
         float mask = smoothstep(T1.w, T2.x, tfbm(xz / (mscale * 5.0) + 17.3, 3, seed + 23u));
-        if (mask > 0.0)
-            h += T1.y * mask * tmountain(xz / mscale, mscale, seed + 31u, minWave);
+        if (mask > 0.0) {
+            // one range is not the next: a slow, very large field lifts some
+            // and holds others down, so a distant skyline is a run of
+            // different ranges rather than one crumpled pattern repeated
+            // (the same in terrain.c)
+            float relief = 0.55 + 0.95 * saturate(tfbm(xz / (mscale * 2.7) + 41.7, 3, seed + 29u) * 0.9 + 0.5);
+            h += T1.y * mask * relief * tmountain(xz / mscale, mscale, seed + 31u, minWave);
+        }
     }
     // rolling hills
     float hscale = T1.x * 1000.0;

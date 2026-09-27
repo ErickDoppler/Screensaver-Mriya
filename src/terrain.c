@@ -191,9 +191,13 @@ static float height_one(const TerrainParams *t, double x, double z, float min_wa
         double mscale = t->mtn_scale_km * 1000.0;
         v2 mp = V2((float)(x / (mscale * 5.0)) + 17.3f, (float)(z / (mscale * 5.0)) + 17.3f);
         float mask = smoothstepf(t->mtn_mask_lo, t->mtn_mask_hi, tfbm(mp, 3, seed + 23u));
-        if (mask > 0.f)
-            h += t->mtn_amp * mask * tmountain(V2((float)(x / mscale), (float)(z / mscale)),
-                                               (float)mscale, seed + 31u, min_wave);
+        if (mask > 0.f) {
+            /* one range is not the next (the same in terrain_fn.glsl) */
+            v2 rp = V2((float)(x / (mscale * 2.7)) + 41.7f, (float)(z / (mscale * 2.7)) + 41.7f);
+            float relief = 0.55f + 0.95f * clampf(tfbm(rp, 3, seed + 29u) * 0.9f + 0.5f, 0.f, 1.f);
+            h += t->mtn_amp * mask * relief * tmountain(V2((float)(x / mscale), (float)(z / mscale)),
+                                                        (float)mscale, seed + 31u, min_wave);
+        }
     }
     double hscale = t->hill_scale_km * 1000.0;
     h += t->hill_amp * tfbm_lim(V2((float)(x / hscale) + 5.1f, (float)(z / hscale) + 5.1f),
@@ -241,11 +245,22 @@ float terrain_max_near(const TerrainParams *t, double x, double z, float radius)
 /* ---------------------------------------------------------------------------
  * The grid levels.
  * ------------------------------------------------------------------------- */
-void terrain_grid_layout(TerrainGrid *g, double cam_x, double cam_z, float agl, float reach) {
+void terrain_grid_layout(TerrainGrid *g, double cam_x, double cam_z, float agl, float reach,
+                         float *s0_state) {
     /* The finest spacing that still earns its triangles: about a hundredth of
      * the height above the ground, as a power of two, never under 4 m. */
-    float s0 = 4.f;
-    while (s0 * 110.f < agl && s0 < 512.f) s0 *= 2.f;
+    float s0 = (s0_state && *s0_state >= 4.f) ? *s0_state : 0.f;
+    if (s0 <= 0.f) {
+        s0 = 4.f;
+        while (s0 * 110.f < agl && s0 < 512.f) s0 *= 2.f;
+    } else {
+        /* held, with a wide margin either way: one step costs a resampling
+         * of the whole landscape, and a threshold sitting under the aircraft
+         * would have it changing shape with every gentle climb and sink */
+        while (s0 < 512.f && agl > s0 * 150.f) s0 *= 2.f;
+        while (s0 > 4.f && agl < s0 * 55.f) s0 *= 0.5f;
+    }
+    if (s0_state) *s0_state = s0;
     g->levels = 0;
     float s = s0;
     while (g->levels < TERRAIN_MAX_LEVELS) {
