@@ -99,7 +99,8 @@ set(MR_SHADERS
   src/shaders/lights.vert src/shaders/lights.frag
   src/shaders/trail.vert src/shaders/trail.frag
   src/shaders/lum.frag src/shaders/adapt.frag src/shaders/final.frag src/shaders/present.frag src/shaders/msresolve.frag
-  src/shaders/hud.vert src/shaders/hud.frag)
+  src/shaders/hud.vert src/shaders/hud.frag
+  src/shaders/panel.vert src/shaders/panel.frag)
 set(MR_SHADER_ABS)
 foreach(s ${MR_SHADERS})
   list(APPEND MR_SHADER_ABS ${CMAKE_CURRENT_SOURCE_DIR}/${s})
@@ -116,7 +117,7 @@ add_custom_command(
 # The screensaver executable
 # ---------------------------------------------------------------------------
 set(MR_SOURCES
-  src/main.c src/app.c src/settings.c src/render.c src/gl_loader.c
+  src/main.c src/app.c src/settings.c src/render.c src/gl_loader.c src/vr.c src/vrmenu.c
   src/model.c src/flight.c src/weather.c src/camera.c src/terrain.c src/hud.c src/trails.c src/realtime.c
   ${MR_SHADERS_GEN} ${MR_BLOBS_S})
 if(WIN32)

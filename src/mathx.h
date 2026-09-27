@@ -166,6 +166,21 @@ static inline mat4 m4_perspective_inf(float fovy_rad, float aspect, float znear)
     r.m[14] = -2.f * znear;
     return r;
 }
+/* A frustum given the tangents of its four half-angles, which need not be
+ * symmetric: a headset's eye looks off to one side of its own screen. The far
+ * plane is at infinity, as m4_perspective_inf. */
+static inline mat4 m4_frustum_inf(float tl, float tr, float td, float tu, float znear) {
+    mat4 r = {{0}};
+    float w = tr - tl, h = tu - td;
+    r.m[0] = 2.f / w;
+    r.m[5] = 2.f / h;
+    r.m[8] = (tr + tl) / w;
+    r.m[9] = (tu + td) / h;
+    r.m[10] = -1.f;
+    r.m[11] = -1.f;
+    r.m[14] = -2.f * znear;
+    return r;
+}
 static inline mat4 m4_ortho(float l, float r_, float b, float t, float n, float f) {
     mat4 r = m4_identity();
     r.m[0] = 2.f / (r_ - l);

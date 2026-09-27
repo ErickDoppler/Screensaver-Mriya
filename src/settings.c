@@ -53,13 +53,13 @@ static const char *const scene_titles[WX_COUNT] = {
 };
 static const char *const camera_names[CAM_COUNT] = {
     "nose", "belly", "spine", "fin", "wingtip", "cockpit", "window", "chin",
-    "engine", "tailplane", "chase", "wingman", "globe"
+    "engine", "tailplane", "chase", "wingman", "globe", "high"
 };
 static const char *const camera_titles[CAM_COUNT] = {
     "On the nose", "Between the engines", "On the spine, looking aft",
     "On top of the fin", "Right wingtip", "Cockpit", "Side window", "Under the chin",
     "Behind the inboard engine", "Tailplane tip", "Chase plane", "Wingman",
-    "Around the aircraft"
+    "Around the aircraft", "High above, over the weather"
 };
 
 const char *settings_scene_name(int scene) {

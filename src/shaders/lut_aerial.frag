@@ -7,7 +7,8 @@ layout(location = 1) out vec4 fragT;
 uniform float uCamR;          // km
 uniform vec3  uSunDir, uSunIllum, uMoonDir, uMoonIllum;
 uniform mat3  uCamBasis;      // right, up, back
-uniform vec2  uTanHalf;       // tan(fov/2) * aspect, tan(fov/2)
+uniform vec2  uTanLo, uTanHi; // the view's half-angles as tangents:
+                              // left/down and right/up, not symmetric in a headset
 
 void main() {
     // which slice and which screen cell this texel is
@@ -15,7 +16,7 @@ void main() {
     float k = floor(x);
     vec2 uv = vec2(x - k, vUV.y);
     vec2 ndc = uv * 2.0 - 1.0;
-    vec3 rd = normalize(uCamBasis * vec3(ndc.x * uTanHalf.x, ndc.y * uTanHalf.y, -1.0));
+    vec3 rd = normalize(uCamBasis * vec3(mix(uTanLo, uTanHi, ndc * 0.5 + 0.5), -1.0));
     float dist = ap_slice_dist(k);
 
     vec3 ro = vec3(0.0, uCamR, 0.0);

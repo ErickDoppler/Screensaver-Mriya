@@ -454,6 +454,44 @@ static void help_panel(const HudInfo *h, float s, float alpha) {
     }
 }
 
+/* ---- the same engine, for the headset's menu ----------------------------- */
+static int g_ui_w, g_ui_h;
+
+void hud_ui_begin(int w, int h, float scale) {
+    g_n = 0;
+    g_ui_w = w; g_ui_h = h;
+    g_scale = scale;
+}
+void hud_ui_rect(float x0, float y0, float x1, float y1, const float col[4]) {
+    quad(x0, y0, x1, y1, -1, 0, -1, 0, col);
+}
+void hud_ui_frame(float x0, float y0, float x1, float y1, float lw, const float col[4]) {
+    rect_outline(x0, y0, x1, y1, lw, col);
+}
+void hud_ui_text(float x, float y, const char *s, float scale, int align, const float col[4], int shadow) {
+    text(x, y, s, scale, align, col, shadow);
+}
+float hud_ui_text_width(const char *s, float scale) { return text_width(s, scale); }
+
+void hud_ui_flush(void) {
+    if (g_n == 0) return;
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glUseProgram(g_prog);
+    glUniform2f(glGetUniformLocation(g_prog, "uRes"), (float)g_ui_w, (float)g_ui_h);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, g_font);
+    glUniform1i(glGetUniformLocation(g_prog, "uFont"), 0);
+    glBindVertexArray(g_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
+    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(sizeof(HVert) * (size_t)g_n), g_v, GL_STREAM_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, g_n);
+    glBindVertexArray(0);
+    glDisable(GL_BLEND);
+    g_n = 0;
+}
+
 void hud_draw(const HudInfo *h) {
     if (h->fade >= 0.99f) return;
     g_n = 0;

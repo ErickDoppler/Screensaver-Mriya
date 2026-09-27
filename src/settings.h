@@ -54,6 +54,7 @@ enum {
     CAM_CHASE,             /* a chase plane behind and above */
     CAM_WINGMAN,           /* a wingman off the left side */
     CAM_GLOBE,             /* free orbit round the aircraft (mouse, wheel) */
+    CAM_HIGH,              /* high above and behind, over the whole sky */
     CAM_COUNT
 };
 #define CAM_ALL ((1 << CAM_COUNT) - 1)

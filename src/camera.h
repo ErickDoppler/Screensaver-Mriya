@@ -25,6 +25,7 @@ typedef struct CamState {
     rng_t  rng;
     float  since_change;
     float  look_yaw, look_pitch;    /* the user's look-around, radians */
+    int    hold_gaze;               /* never ease it back to centre (VR) */
     float  look_idle;               /* seconds since the user last looked */
     float  fade;                    /* 1 = black, for the cut between mounts */
     int    pending;                 /* the mount to cut to when faded */
@@ -59,6 +60,9 @@ const char *camera_view_name(const CamState *c);
 int  camera_next_view(const CamState *c);
 /* The mouse wheel: zooms the lens, or on the globe camera moves in and out. */
 void camera_wheel(CamState *c, float steps);
+/* In a headset the view is aimed by hand and by head: it must stay where it
+ * was put, so the easing back to centre is switched off. */
+void camera_hold_gaze(CamState *c, int hold);
 void camera_look(CamState *c, float dyaw, float dpitch);
 /* Replaces the mount with one given in the body frame (for testing). */
 void camera_debug(CamState *c, vec3 pos, float yaw, float pitch, float fov);

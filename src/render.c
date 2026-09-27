@@ -21,7 +21,7 @@ extern const char shader_common_glsl[], shader_atmosphere_glsl[], shader_terrain
     shader_clouds_frag[], shader_cloudtaa_frag[], shader_composite_frag[], shader_probe_frag[], shader_precip_vert[],
     shader_precip_frag[], shader_bolt_vert[], shader_bolt_frag[], shader_lights_vert[],
     shader_lights_frag[], shader_lum_frag[], shader_adapt_frag[], shader_final_frag[], shader_present_frag[], shader_msresolve_frag[],
-    shader_trail_vert[], shader_trail_frag[];
+    shader_trail_vert[], shader_trail_frag[], shader_panel_vert[], shader_panel_frag[];
 
 /* Sizes of things. */
 #define TRANS_W 256
@@ -183,7 +183,7 @@ Quality render_quality(int setting) {
     if (q >= 0.3f) {
         float t = (q - 0.3f) / 0.7f;
         o.scale = lerpf(0.7f, 1.0f, t);
-        o.cloud_scale = lerpf(0.45f, 0.6f, t);
+        o.cloud_scale = lerpf(0.45f, 0.78f, t);
         o.cloud_steps = (int)lerpf(64.f, 140.f, t);
         o.samples = 4;
     } else {
@@ -351,6 +351,9 @@ int render_init(Renderer *r, int quality) {
         const char *vs4[] = { C, shader_trail_vert };
         const char *fs4[] = { C, shader_trail_frag };
         r->p_trail = render_program(vs4, 2, fs4, 2, "trail");
+        const char *vs5[] = { C, shader_panel_vert };
+        const char *fs5[] = { C, shader_panel_frag };
+        r->p_panel = render_program(vs5, 2, fs5, 2, "panel");
     }
     unsigned progs[] = { r->p_trans, r->p_multi, r->p_skyview, r->p_aerial, r->p_noise, r->p_weather,
                          r->p_cshadow, r->p_probe, r->p_sky, r->p_clouds, r->p_composite, r->p_lum,
@@ -425,6 +428,8 @@ int render_init(Renderer *r, int quality) {
 }
 
 /* --- window-sized targets ------------------------------------------------- */
+void render_set_eye(Renderer *r, int eye) { r->eye = (eye > 0 && eye < MR_EYES) ? eye : 0; }
+
 void render_resize(Renderer *r, int w, int h) {
     r->width = w > 1 ? w : 1;
     r->height = h > 1 ? h : 1;
@@ -449,7 +454,10 @@ static void ensure_targets(Renderer *r) {
     del_tex(&r->t_ms_color); del_tex(&r->t_ms_dist); del_fbo(&r->f_ms);
     if (r->rb_ms_depth) { glDeleteRenderbuffers(1, &r->rb_ms_depth); r->rb_ms_depth = 0; }
     del_tex(&r->t_clouds); del_tex(&r->t_cdepth); del_fbo(&r->f_clouds);
-    for (int i = 0; i < 2; ++i) { del_tex(&r->t_hist[i]); del_tex(&r->t_hdepth[i]); del_fbo(&r->f_hist[i]); }
+    for (int e = 0; e < MR_EYES; ++e)
+        for (int i = 0; i < 2; ++i) {
+            del_tex(&r->t_hist[e][i]); del_tex(&r->t_hdepth[e][i]); del_fbo(&r->f_hist[e][i]);
+        }
     for (int i = 0; i < 2; ++i) { del_tex(&r->t_bloom[i]); del_fbo(&r->f_bloom[i]); }
 
     r->t_scene = make_tex2d(r->w, r->h, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR, GL_CLAMP_TO_EDGE);
@@ -525,11 +533,13 @@ static void ensure_targets(Renderer *r) {
     r->t_cdepth = make_tex2d(r->cw, r->ch, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
     r->f_clouds = make_fbo(r->t_clouds, r->t_cdepth);
     for (int i = 0; i < 2; ++i) {
-        r->t_hist[i] = make_tex2d(r->cw, r->ch, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR, GL_CLAMP_TO_EDGE);
-        r->t_hdepth[i] = make_tex2d(r->cw, r->ch, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
-        r->f_hist[i] = make_fbo(r->t_hist[i], r->t_hdepth[i]);
+        for (int e = 0; e < MR_EYES; ++e) {
+            r->t_hist[e][i] = make_tex2d(r->cw, r->ch, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_LINEAR, GL_CLAMP_TO_EDGE);
+            r->t_hdepth[e][i] = make_tex2d(r->cw, r->ch, GL_R32F, GL_RED, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+            r->f_hist[e][i] = make_fbo(r->t_hist[e][i], r->t_hdepth[e][i]);
+        }
     }
-    r->hist_valid = 0;
+    for (int e = 0; e < MR_EYES; ++e) r->hist_valid[e] = 0;
 
     r->bloom_w = r->w / 4 > 1 ? r->w / 4 : 1;
     r->bloom_h = r->h / 4 > 1 ? r->h / 4 : 1;
@@ -836,7 +846,8 @@ void render_frame(Renderer *r, const Frame *f) {
     u3v(r->p_aerial, "uMoonDir", L.moon_dir);
     u3v(r->p_aerial, "uMoonIllum", L.moon_illum);
     um3(r->p_aerial, "uCamBasis", f->cam_basis);
-    u2f(r->p_aerial, "uTanHalf", th * aspect, th);
+    u2f(r->p_aerial, "uTanLo", f->tan_l, f->tan_d);
+    u2f(r->p_aerial, "uTanHi", f->tan_r, f->tan_u);
     draw_fullscreen();
 
     /* --- 2. weather map and cloud shadows ------------------------------------ */
@@ -958,7 +969,7 @@ void render_frame(Renderer *r, const Frame *f) {
     glClear(GL_DEPTH_BUFFER_BIT);
     mat4 view = m4_view(f->cam_basis, v3(0.f, 0.f, 0.f));
     float terr_near = clampf(f->agl * 0.35f, 5.f, 3000.f);
-    mat4 proj_terr = m4_perspective_inf(f->fov, aspect, terr_near);
+    mat4 proj_terr = m4_frustum_inf(f->tan_l, f->tan_r, f->tan_d, f->tan_u, terr_near);
     mat4 vp_terr = m4_mul(proj_terr, view);
     float pixel_angle = 2.f * th / (float)r->h;
 
@@ -1035,7 +1046,8 @@ void render_frame(Renderer *r, const Frame *f) {
         set_luts(p, r, 0);
         tex(p, "uSkyView", 4, GL_TEXTURE_2D, r->t_skyview);
         um3(p, "uCamBasis", f->cam_basis);
-        u2f(p, "uTanHalf", th * aspect, th);
+        u2f(p, "uTanLo", f->tan_l, f->tan_d);
+        u2f(p, "uTanHi", f->tan_r, f->tan_u);
         u1f(p, "uCamRkm", L.cam_rkm);
         u3v(p, "uSunDir", L.sun_dir);
         u3v(p, "uSunIllum", L.sun_illum);
@@ -1057,7 +1069,7 @@ void render_frame(Renderer *r, const Frame *f) {
 
     /* the aircraft, in its own depth range */
     glClear(GL_DEPTH_BUFFER_BIT);
-    mat4 proj_ac = m4_perspective_inf(f->fov, aspect, f->near_plane);
+    mat4 proj_ac = m4_frustum_inf(f->tan_l, f->tan_r, f->tan_d, f->tan_u, f->near_plane);
     mat4 vp_ac = m4_mul(proj_ac, view);
     r->view_proj = vp_ac;
     {
@@ -1143,7 +1155,8 @@ void render_frame(Renderer *r, const Frame *f) {
         /* the aircraft: 45 m round its middle, however far the camera is */
         u1f(p, "uAircraftReach", v3_len(ac_rel) + 48.f);
         um3(p, "uCamBasis", f->cam_basis);
-        u2f(p, "uTanHalf", th * aspect, th);
+        u2f(p, "uTanLo", f->tan_l, f->tan_d);
+        u2f(p, "uTanHi", f->tan_r, f->tan_u);
         u2f(p, "uFullRes", (float)r->w, (float)r->h);
         u1f(p, "uFrame", (float)(r->frame_index % 64u));
         glUniform1i(loc(p, "uSteps"), r->q.cloud_steps);
@@ -1168,33 +1181,36 @@ void render_frame(Renderer *r, const Frame *f) {
 
     /* --- 6b. accumulate them over frames -------------------------------------------- */
     {
-        int out = r->hist_idx ^ 1;
-        dvec3 dcam = dv3_sub(f->cam_pos, r->prev_cam);
+        int ey = r->eye;
+        int out = r->hist_idx[ey] ^ 1;
+        dvec3 dcam = dv3_sub(f->cam_pos, r->prev_cam[ey]);
         /* a cut, a jump or a new window: nothing in the history is usable */
-        int valid = r->hist_valid && dv3_dot(dcam, dcam) < 400.0 * 400.0 && f->fade < 0.5 &&
-                    v3_dot(r->prev_basis.z, f->cam_basis.z) > 0.7;
-        glBindFramebuffer(GL_FRAMEBUFFER, r->f_hist[out]);
+        int valid = r->hist_valid[ey] && dv3_dot(dcam, dcam) < 400.0 * 400.0 && f->fade < 0.5 &&
+                    v3_dot(r->prev_basis[ey].z, f->cam_basis.z) > 0.7;
+        glBindFramebuffer(GL_FRAMEBUFFER, r->f_hist[ey][out]);
         glViewport(0, 0, r->cw, r->ch);
         unsigned p = r->p_cloudtaa;
         glUseProgram(p);
         tex(p, "uCur", 0, GL_TEXTURE_2D, r->t_clouds);
         tex(p, "uCurDepth", 1, GL_TEXTURE_2D, r->t_cdepth);
-        tex(p, "uHist", 2, GL_TEXTURE_2D, r->t_hist[r->hist_idx]);
-        tex(p, "uHistDepth", 3, GL_TEXTURE_2D, r->t_hdepth[r->hist_idx]);
+        tex(p, "uHist", 2, GL_TEXTURE_2D, r->t_hist[ey][r->hist_idx[ey]]);
+        tex(p, "uHistDepth", 3, GL_TEXTURE_2D, r->t_hdepth[ey][r->hist_idx[ey]]);
         um3(p, "uCamBasis", f->cam_basis);
-        u2f(p, "uTanHalf", th * aspect, th);
-        um3(p, "uPrevBasis", r->prev_basis);
-        u2f(p, "uPrevTanHalf", r->prev_th * r->prev_aspect, r->prev_th);
+        u2f(p, "uTanLo", f->tan_l, f->tan_d);
+        u2f(p, "uTanHi", f->tan_r, f->tan_u);
+        um3(p, "uPrevBasis", r->prev_basis[ey]);
+        u2f(p, "uPrevTanLo", r->prev_tan_l[ey], r->prev_tan_d[ey]);
+        u2f(p, "uPrevTanHi", r->prev_tan_r[ey], r->prev_tan_u[ey]);
         u3f(p, "uCamDelta", (float)dcam.x, (float)dcam.y, (float)dcam.z);
         u1f(p, "uBlend", valid ? 0.88f : 0.f);
         u2f(p, "uRes", (float)r->cw, (float)r->ch);
         draw_fullscreen();
-        r->hist_idx = out;
-        r->hist_valid = 1;
-        r->prev_cam = f->cam_pos;
-        r->prev_basis = f->cam_basis;
-        r->prev_th = th;
-        r->prev_aspect = aspect;
+        r->hist_idx[ey] = out;
+        r->hist_valid[ey] = 1;
+        r->prev_cam[ey] = f->cam_pos;
+        r->prev_basis[ey] = f->cam_basis;
+        r->prev_tan_l[ey] = f->tan_l; r->prev_tan_r[ey] = f->tan_r;
+        r->prev_tan_d[ey] = f->tan_d; r->prev_tan_u[ey] = f->tan_u;
     }
 
     /* --- 7. composite and what goes on top ------------------------------------------ */
@@ -1205,15 +1221,16 @@ void render_frame(Renderer *r, const Frame *f) {
         glUseProgram(p);
         tex(p, "uScene", 0, GL_TEXTURE_2D, r->t_scene);
         tex(p, "uDistTex", 1, GL_TEXTURE_2D, r->t_dist);
-        tex(p, "uClouds", 2, GL_TEXTURE_2D, r->t_hist[r->hist_idx]);
-        tex(p, "uCloudDepth", 5, GL_TEXTURE_2D, r->t_hdepth[r->hist_idx]);
+        tex(p, "uClouds", 2, GL_TEXTURE_2D, r->t_hist[r->eye][r->hist_idx[r->eye]]);
+        tex(p, "uCloudDepth", 5, GL_TEXTURE_2D, r->t_hdepth[r->eye][r->hist_idx[r->eye]]);
         tex(p, "uProbe", 3, GL_TEXTURE_2D, r->t_probe);
         u2f(p, "uCloudRes", (float)r->cw, (float)r->ch);
         u2f(p, "uFullRes", (float)r->w, (float)r->h);
         u1f(p, "uPassage", f->passage);
         u1f(p, "uTime", f->time);
         um3(p, "uCamBasis", f->cam_basis);
-        u2f(p, "uTanHalf", th * aspect, th);
+        u2f(p, "uTanLo", f->tan_l, f->tan_d);
+        u2f(p, "uTanHi", f->tan_r, f->tan_u);
         {
             float pl[18];
             for (int e = 0; e < TRAIL_ENGINES; ++e) {
@@ -1381,6 +1398,53 @@ void render_frame(Renderer *r, const Frame *f) {
             glBindBuffer(GL_ARRAY_BUFFER, 0);
         }
     }
+    /* The headset's menu: a page on a quad in the world, with the pointer
+     * rays that work it. Drawn last and without depth, so it can always be
+     * read whatever it is hanging in front of. */
+    if (f->ui_tex && f->ui_alpha > 0.01f) {
+        float q[3][12];
+        int nq = 0;
+        vec3 ux = v3_scale(f->ui_basis.x, f->ui_w), uy = v3_scale(f->ui_basis.y, f->ui_h);
+        q[nq][0] = f->ui_pos.x; q[nq][1] = f->ui_pos.y; q[nq][2] = f->ui_pos.z; q[nq][3] = 0.f;
+        q[nq][4] = ux.x; q[nq][5] = ux.y; q[nq][6] = ux.z; q[nq][7] = 0.f;
+        q[nq][8] = uy.x; q[nq][9] = uy.y; q[nq][10] = uy.z; q[nq][11] = 0.f;
+        nq++;
+        for (int h = 0; h < 2 && nq < 3; ++h) {
+            if (!f->ray_on[h]) continue;
+            vec3 a0 = f->ray_from[h], b0 = f->ray_to[h];
+            vec3 mid = v3_scale(v3_add(a0, b0), 0.5f);
+            vec3 along = v3_sub(b0, a0);
+            vec3 side = v3_cross(v3_norm(along), v3_norm(mid));
+            float sl = v3_len(side);
+            side = sl > 1e-4f ? v3_scale(side, 0.008f / sl) : v3(0.008f, 0.f, 0.f);
+            q[nq][0] = mid.x; q[nq][1] = mid.y; q[nq][2] = mid.z; q[nq][3] = 0.f;
+            q[nq][4] = side.x; q[nq][5] = side.y; q[nq][6] = side.z; q[nq][7] = 0.f;
+            q[nq][8] = along.x; q[nq][9] = along.y; q[nq][10] = along.z; q[nq][11] = 1.f;
+            nq++;
+        }
+        unsigned pnl = r->p_panel;
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_DEPTH_TEST);
+        glUseProgram(pnl);
+        um4(pnl, "uViewProj", &vp_ac);
+        tex(pnl, "uPage", 0, GL_TEXTURE_2D, f->ui_tex);
+        u1f(pnl, "uAlpha", f->ui_alpha);
+        glBindBuffer(GL_ARRAY_BUFFER, r->trail_vbo);
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(sizeof(float) * 12 * (size_t)nq), q, GL_STREAM_DRAW);
+        for (int i = 0; i < 3; ++i) {
+            glEnableVertexAttribArray((GLuint)i);
+            glVertexAttribDivisor((GLuint)i, 1);
+            glVertexAttribPointer((GLuint)i, 4, GL_FLOAT, GL_FALSE, 48, (void *)(size_t)(i * 16));
+        }
+        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, nq);
+        for (int i = 0; i < 3; ++i) {
+            glVertexAttribDivisor((GLuint)i, 0);
+            glDisableVertexAttribArray((GLuint)i);
+        }
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+
     /* the navigation lights */
     if (f->nav_lights) {
         unsigned p = r->p_lights;
@@ -1488,8 +1552,8 @@ void render_frame(Renderer *r, const Frame *f) {
         u2f(p, "uRes", (float)r->width, (float)r->height);
         draw_fullscreen();
     }
-    /* grain and the fade, onto the screen */
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    /* grain and the fade, onto the screen - or into the headset's own image */
+    glBindFramebuffer(GL_FRAMEBUFFER, f->target_fbo);
     glViewport(0, 0, r->width, r->height);
     {
         unsigned p = r->p_present;

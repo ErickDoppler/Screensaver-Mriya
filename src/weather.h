@@ -95,6 +95,8 @@ void weather_init(WeatherState *w, const Settings *s, unsigned seed, int first);
 /* Deals the next scenario and starts the change into it. `quick` (the user
  * asked for it) makes the change take seconds rather than a minute. */
 void weather_next(WeatherState *w, const Settings *s, int quick);
+/* Changes to one particular scenario (the VR sticks, the menu). */
+void weather_change_to(WeatherState *w, int kind, int quick);
 /* Starts a change into a given Weather (real time: the live conditions). */
 void weather_to(WeatherState *w, const Weather *target, int quick);
 /* Jumps straight to a scenario with no passage (start-up, command line). */

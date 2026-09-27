@@ -55,7 +55,9 @@ void weather_make(Weather *w, int kind, rng_t *r) {
         break;
     case WX_CUMULUS:
         w->sun_elev = rng_range(r, 45.f, 62.f);
-        w->low = layer(1300.f, 2900.f, 0.42f, 0.62f, 1.f, 2.0f, 0.55f);
+        /* fair-weather cumulus are shallow: a flat base and a thousand
+         * metres of cauliflower above it, not a deep mass */
+        w->low = layer(1300.f, 2400.f, 0.42f, 0.62f, 1.f, 1.5f, 0.55f);
         w->cirrus_cover = 0.2f;
         w->haze = 1.3f;
         w->humidity = 0.45f;
@@ -460,7 +462,13 @@ static float peak_near(const TerrainParams *t, dvec3 ac) {
 
 void weather_next(WeatherState *w, const Settings *s, int quick) {
     if (w->passage_dir > 0) return;               /* already inside a jump */
-    w->next_kind = deal(w, s);
+    weather_change_to(w, deal(w, s), quick);
+}
+
+/* The same change, to a scenario somebody picked rather than the deck's. */
+void weather_change_to(WeatherState *w, int kind, int quick) {
+    if (w->passage_dir > 0) return;
+    w->next_kind = kind;
     /* Whatever is showing - even halfway through a change - is where the
      * next change starts from. */
     w->from = w->cur;

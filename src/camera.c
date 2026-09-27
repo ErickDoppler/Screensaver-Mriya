@@ -40,6 +40,9 @@ static const Mount mounts[CAM_COUNT] = {
     /* CAM_GLOBE: free orbit round the middle of the aircraft (placed in
      * camera_update; the mouse steers it, the wheel sets the distance) */
     { {   0.0f, 1.5f,   0.0f },    0.f,   0.f, 50.f, 1, 0, 0.f, 0, 0.f, 0.f },
+    /* CAM_HIGH: high above and behind, looking down over the aircraft at the
+     * weather it is crossing - or back the way it came */
+    { {   0.0f, 25.0f, 60.0f },    0.f, -22.f, 75.f, 1, 0, 4.f, 1, 180.f, -18.f },
 };
 
 static Mount g_debug_mount;
@@ -118,6 +121,8 @@ int camera_next_view(const CamState *c) {
     int n = view_count(camera_mount(c->kind));
     return n > 1 ? (c->view + 1) % n : 0;
 }
+
+void camera_hold_gaze(CamState *c, int hold) { c->hold_gaze = hold; }
 
 void camera_wheel(CamState *c, float steps) {
     if (c->kind == CAM_GLOBE) {
@@ -210,8 +215,8 @@ void camera_update(CamState *c, const Settings *s, const Flight *f, float dt, in
     } else if (c->fade > 0.f) {
         c->fade = fmaxf(0.f, c->fade - dt / FADE_TIME);
     }
-    /* the gaze eases home after a while */
-    if (c->look_idle > LOOK_RETURN) {
+    /* the gaze eases home after a while - unless a hand is aiming it */
+    if (c->look_idle > LOOK_RETURN && !c->hold_gaze) {
         c->look_yaw = approachf(c->look_yaw, 0.f, 3.f, dt);
         c->look_pitch = approachf(c->look_pitch, 0.f, 3.f, dt);
     }
@@ -224,7 +229,7 @@ void camera_update(CamState *c, const Settings *s, const Flight *f, float dt, in
         /* Round the middle of the aircraft, in a frame that turns with its
          * heading but stays level, so the horizon does not roll with every
          * bank. Left alone it drifts slowly round. */
-        if (c->look_idle > 4.f) c->look_yaw = wrapf(c->look_yaw + dt * DEG2RAD(4.f), -MR_PI, MR_PI);
+        if (c->look_idle > 4.f && !c->hold_gaze) c->look_yaw = wrapf(c->look_yaw + dt * DEG2RAD(4.f), -MR_PI, MR_PI);
         vec3 fwd = v3_scale(dv3_to_v3(att.z), -1.f);
         vec3 fh = v3_norm(v3(fwd.x, 0.f, fwd.z));
         vec3 right = v3_norm(v3_cross(fh, v3(0.f, 1.f, 0.f)));

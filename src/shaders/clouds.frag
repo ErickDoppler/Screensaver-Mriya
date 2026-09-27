@@ -10,7 +10,8 @@ layout(location = 0) out vec4 frag;
 layout(location = 1) out vec4 fragDepth;
 
 uniform mat3  uCamBasis;
-uniform vec2  uTanHalf;
+uniform vec2  uTanLo, uTanHi; // the view's half-angles as tangents:
+                              // left/down and right/up, not symmetric in a headset
 uniform sampler2D uDistTex;     // scene distance, metres (sky: huge)
 uniform float uAircraftReach;   // nearer than this is the aircraft: march past it
 uniform sampler2D uProbe;
@@ -97,7 +98,7 @@ vec4 cirrus(vec3 rd, float scene_t) {
 
 void main() {
     vec2 ndc = vUV * 2.0 - 1.0;
-    vec3 rd = normalize(uCamBasis * vec3(ndc.x * uTanHalf.x, ndc.y * uTanHalf.y, -1.0));
+    vec3 rd = normalize(uCamBasis * vec3(mix(uTanLo, uTanHi, ndc * 0.5 + 0.5), -1.0));
 
     // nearest surface under this low-res pixel (conservative: the closest of
     // the full-res pixels it covers)
@@ -170,7 +171,10 @@ void main() {
                     float powder = 1.0 - exp(-d * CLOUD_EXT * 120.0);
                     powder = mix(1.0, powder, saturate(0.5 - 0.5 * cos_t) * 0.8);
                     Ls = sunL * ms * powder;
-                    Ls += mix(amb_bot, amb_top, saturate(hf * 1.2)) * (0.45 + 0.55 * hf);
+                    // deeper in the layer it is darker: without that the
+                    // crevices between cells fill with ambient and the deck
+                    // flattens into an even field
+                    Ls += mix(amb_bot, amb_top, saturate(hf * 1.2)) * (0.25 + 0.8 * hf * hf);
                 } else {
                     // rain: grey, lit mostly by the sky
                     Ls = sunL * hg(cos_t, 0.4) * 0.15 + mix(amb_bot, amb_top, 0.5) * 0.5;

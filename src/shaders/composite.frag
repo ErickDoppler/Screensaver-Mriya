@@ -16,7 +16,8 @@ uniform float uPassage;
 uniform float uTime;
 uniform float uFlashScreen;
 uniform mat3  uCamBasis;
-uniform vec2  uTanHalf;
+uniform vec2  uTanLo, uTanHi; // the view's half-angles as tangents:
+                              // left/down and right/up, not symmetric in a headset
 uniform vec3  uPlume[6];        // engine nozzles, camera-relative
 uniform vec3  uPlumeDir;        // aft, along the exhaust
 uniform float uHaze;            // how hard the hot exhaust shimmers
@@ -27,7 +28,7 @@ uniform float uHaze;            // how hard the hot exhaust shimmers
 vec2 exhaust_shimmer(vec2 uv, float scene_t) {
     if (uHaze <= 0.0) return vec2(0.0);
     vec2 ndc = uv * 2.0 - 1.0;
-    vec3 rd = normalize(uCamBasis * vec3(ndc.x * uTanHalf.x, ndc.y * uTanHalf.y, -1.0));
+    vec3 rd = normalize(uCamBasis * vec3(mix(uTanLo, uTanHi, ndc * 0.5 + 0.5), -1.0));
     float s = 0.0;
     for (int i = 0; i < 6; ++i) {
         vec3 a = uPlume[i];

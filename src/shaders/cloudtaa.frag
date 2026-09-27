@@ -13,9 +13,10 @@ uniform sampler2D uCurDepth;   // where along the ray they are, metres
 uniform sampler2D uHist;
 uniform sampler2D uHistDepth;
 uniform mat3  uCamBasis;
-uniform vec2  uTanHalf;
+uniform vec2  uTanLo, uTanHi; // the view's half-angles as tangents:
+                              // left/down and right/up, not symmetric in a headset
 uniform mat3  uPrevBasis;
-uniform vec2  uPrevTanHalf;
+uniform vec2  uPrevTanLo, uPrevTanHi;  // last frame's frustum, as tangents
 uniform vec3  uCamDelta;       // this camera minus last frame's, world metres
 uniform float uBlend;          // weight of the history, 0 resets
 uniform vec2  uRes;
@@ -24,15 +25,17 @@ void main() {
     vec4 cur = texture(uCur, vUV);
     float d = texture(uCurDepth, vUV).r;
     vec2 ndc = vUV * 2.0 - 1.0;
-    vec3 rd = normalize(uCamBasis * vec3(ndc.x * uTanHalf.x, ndc.y * uTanHalf.y, -1.0));
+    vec3 rd = normalize(uCamBasis * vec3(mix(uTanLo, uTanHi, ndc * 0.5 + 0.5), -1.0));
     // the point this pixel sees, relative to last frame's camera
     vec3 p = rd * d + uCamDelta;
     vec3 v = transpose(uPrevBasis) * p;           // into last frame's camera space
     vec4 res = cur;
     float hd = d;
     if (v.z < -1.0 && uBlend > 0.0) {
-        vec2 pn = vec2(v.x / (-v.z * uPrevTanHalf.x), v.y / (-v.z * uPrevTanHalf.y));
-        vec2 puv = pn * 0.5 + 0.5;
+        // where it was on last frame's screen: its frustum need not be
+        // symmetric, and in a headset each eye's is different again
+        vec2 t = v.xy / -v.z;
+        vec2 puv = (t - uPrevTanLo) / (uPrevTanHi - uPrevTanLo);
         if (all(greaterThan(puv, vec2(0.0))) && all(lessThan(puv, vec2(1.0)))) {
             vec4 hist = texture(uHist, puv);
             // the neighbourhood's range: history outside it is stale

@@ -62,7 +62,7 @@
 #define IDC_SCENE_LAST    (IDC_SCENE_FIRST + 26)
 #define IDC_CAM_BOX       1140
 #define IDC_CAM_FIRST     1141
-#define IDC_CAM_LAST      (IDC_CAM_FIRST + 12)
+#define IDC_CAM_LAST      (IDC_CAM_FIRST + 13)
 #define IDC_SCENE_ALL     1160
 #define IDC_SCENE_NONE    1161
 

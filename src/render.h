@@ -36,6 +36,21 @@ typedef struct Frame {
     dvec3  cam_pos;
     basis3 cam_basis;
     float  fov, near_plane;
+    /* The view's four half-angles, as tangents (left, right, down, up). On
+     * screen they are symmetric and come from fov and the aspect; in a
+     * headset each eye looks off to one side and they are not. */
+    float  tan_l, tan_r, tan_d, tan_u;
+    /* Where the finished picture goes: 0 is the window. A headset hands over
+     * its own texture for each eye. */
+    unsigned target_fbo;
+    /* The headset's menu: a page on a quad in the world, and the pointer rays
+     * from the controllers. All in the camera's frame, metres. */
+    unsigned ui_tex;
+    vec3     ui_pos;
+    basis3   ui_basis;
+    float    ui_w, ui_h, ui_alpha;
+    vec3     ray_from[2], ray_to[2];
+    int      ray_on[2];
     int    cam_external;
     int    cam_on_airframe;
     dvec3  ac_pos;
@@ -59,11 +74,13 @@ typedef struct Frame {
     dvec3  wind_off;             /* the air mass's drift: contrails move with it */
 } Frame;
 
+#define MR_EYES 2
+
 typedef struct Renderer {
     /* programs */
     unsigned p_trans, p_multi, p_skyview, p_aerial, p_noise, p_weather, p_cshadow,
              p_probe, p_sky, p_terrain, p_aircraft, p_shadow, p_clouds, p_composite,
-             p_precip, p_bolt, p_lights, p_lum, p_adapt, p_bright, p_blur, p_blit, p_final, p_present, p_resolve, p_trail, p_cloudtaa;
+             p_precip, p_bolt, p_lights, p_lum, p_adapt, p_bright, p_blur, p_blit, p_final, p_present, p_resolve, p_trail, p_cloudtaa, p_panel;
     unsigned vao;              /* empty, for fullscreen passes and generated geometry */
     /* the atmosphere */
     unsigned t_trans, f_trans, t_multi, f_multi, t_skyview, f_skyview;
@@ -74,11 +91,15 @@ typedef struct Renderer {
     unsigned t_noise_base, t_noise_detail;
     unsigned t_weather, f_weather, t_cshadow, f_cshadow, t_probe, f_probe;
     unsigned t_clouds, t_cdepth, f_clouds;
-    unsigned t_hist[2], t_hdepth[2], f_hist[2];   /* accumulated clouds, ping-pong */
-    int      hist_idx, hist_valid;
-    dvec3    prev_cam;
-    basis3   prev_basis;
-    float    prev_th, prev_aspect;
+    /* The clouds are gathered over frames, and each eye gathers its own: one
+     * history shared between two eyes would drag each eye's picture onto the
+     * other's, which in a headset is seen at once. */
+    unsigned t_hist[MR_EYES][2], t_hdepth[MR_EYES][2], f_hist[MR_EYES][2];
+    int      hist_idx[MR_EYES], hist_valid[MR_EYES];
+    int      eye;                                 /* which one is being drawn */
+    dvec3    prev_cam[MR_EYES];
+    basis3   prev_basis[MR_EYES];
+    float    prev_tan_l[MR_EYES], prev_tan_r[MR_EYES], prev_tan_d[MR_EYES], prev_tan_u[MR_EYES];
     /* the aircraft */
     Model    model;
     Decal    decals[MAX_DECALS];
@@ -121,6 +142,8 @@ typedef struct Renderer {
 
 int  render_init(Renderer *r, int quality);
 void render_resize(Renderer *r, int w, int h);
+/* Which eye the next render_frame draws: 0 on screen, 0 and 1 in a headset. */
+void render_set_eye(Renderer *r, int eye);
 void render_frame(Renderer *r, const Frame *f);
 void render_shutdown(Renderer *r);
 int  render_dump_png(const Renderer *r, const char *path);

@@ -6,7 +6,8 @@ layout(location = 1) out vec4 fragDist;
 
 uniform sampler2D uSkyView;
 uniform mat3  uCamBasis;
-uniform vec2  uTanHalf;
+uniform vec2  uTanLo, uTanHi; // the view's half-angles as tangents:
+                              // left/down and right/up, not symmetric in a headset
 uniform float uCamRkm;
 uniform vec3  uSunDir, uSunIllum, uMoonDir, uMoonIllum;
 uniform float uMoonPhase;
@@ -30,7 +31,10 @@ vec3 stars(vec3 d) {
     vec3 sum = vec3(0.0);
     ivec2 base = ivec2(floor(g));
     float px = uPixelAngle * CELLS * 0.5;       // the pixel's size in cells
-    float r = max(px * 0.75, 0.02);
+    // A star spread over two pixels or so, never one. At a pixel wide it
+    // lands differently every frame as the view moves and flickers hard -
+    // mild on a monitor, unbearable in a headset at ninety frames a second.
+    float r = max(px * 2.0, 0.02);
     for (int y = -1; y <= 1; ++y)
     for (int x = -1; x <= 1; ++x) {
         ivec2 c = base + ivec2(x, y);
@@ -43,7 +47,7 @@ vec3 stars(vec3 d) {
         // cold: mostly blue-white, a few pale yellow
         vec3 tint = temp < 0.12 ? vec3(1.0, 0.9, 0.78) : mix(vec3(0.86, 0.92, 1.0), vec3(0.72, 0.82, 1.0), temp);
         float dd = length(g - pos) / r;
-        float twinkle = 0.9 + 0.1 * sin(uTime * (2.0 + temp * 4.0) + float(h & 255u));
+        float twinkle = 0.94 + 0.06 * sin(uTime * (2.0 + temp * 4.0) + float(h & 255u));
         // flux spread over the footprint, so its size on screen never grows
         sum += tint * exp(-dd * dd * 2.0) * (0.0025 + mag * 0.35) * twinkle * (0.64 / (r * r * 6.283));
     }
@@ -158,7 +162,7 @@ vec3 aurora(vec3 d) {
 
 void main() {
     vec2 ndc = vUV * 2.0 - 1.0;
-    vec3 d = normalize(uCamBasis * vec3(ndc.x * uTanHalf.x, ndc.y * uTanHalf.y, -1.0));
+    vec3 d = normalize(uCamBasis * vec3(mix(uTanLo, uTanHi, ndc * 0.5 + 0.5), -1.0));
     // level 0 by hand: the azimuth wraps due south, and the jump in the
     // derivatives there would pull the smallest mip - a line across the sky
     vec3 col = textureLod(uSkyView, skyview_uv(d, uCamRkm), 0.0).rgb;
@@ -191,13 +195,16 @@ void main() {
             vec3 my = cross(mz, mx);
             vec2 q = vec2(dot(d - mz, mx), dot(d - mz, my)) / mr;
             float rr = dot(q, q);
-            if (rr < 1.0) {
-                vec3 n = vec3(q, sqrt(1.0 - rr));
+            if (rr < 1.05) {
+                vec3 n = vec3(q, sqrt(max(1.0 - rr, 0.0)));
+                // a hard-edged disc reads as a lamp a few metres off; the
+                // real one's edge is softened by the air it is seen through
+                float edge = 1.0 - smoothstep(0.93, 1.0, sqrt(rr));
                 float ph = (1.0 - uMoonPhase) * PI;          // terminator angle
                 vec3 ldir = vec3(sin(ph), 0.15, cos(ph));
                 float lit = saturate(dot(n, normalize(ldir)));
                 float maria = 0.75 + 0.25 * snoise2(q * 3.0 + 7.0) - 0.2 * smoothstep(0.55, 0.7, snoise2(q * 1.6 + 2.0));
-                vec3 L = uMoonIllum * 30000.0 * lit * maria;
+                vec3 L = uMoonIllum * 21000.0 * lit * maria * edge;
                 col = mix(col, col * 0.2, 0.0) + L * T;
             }
         }

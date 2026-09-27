@@ -48,6 +48,12 @@ are written, but not yet tested on Linux.**
   stick asks for a pitch rate (3 deg/s slow, 10 deg/s from 540 km/h), the
   ceiling is wherever the thrust runs out, and a terrain floor 50 m above the
   ground takes over gently if you dive at it.
+* **VR (in progress).** With a headset plugged in it goes stereo through
+  OpenXR, which both the Oculus runtime and SteamVR speak; no loader library
+  is shipped, the active runtime is found and loaded at start-up. The
+  controllers turn and move the camera, change the scenery and the camera,
+  and put up a menu panel in the world. Tested on a Quest 2; rough edges
+  remain.
 * **Thirteen cameras**, four views on most: the nose (with a flight HUD), the
   cockpit roof, the spine, the fin top, a wingtip, the side window, the chin,
   behind an engine, between the engines, the tailplane, a chase plane, a
@@ -352,6 +358,6 @@ See [docs/DESIGN.md](docs/DESIGN.md) for how it is drawn and flown.
 
 MIT for the code. The aircraft model `res/models/Mriya.glb` is included for
 building the screensaver. Dependencies: SDL3 (zlib), stb (public domain /
-MIT). Build tools: w64devkit / GCC (GPL with runtime exception), CMake (BSD),
+MIT), the OpenXR headers (Apache 2.0, Khronos). Build tools: w64devkit / GCC (GPL with runtime exception), CMake (BSD),
 Ninja (Apache 2.0). Weather data: [Open-Meteo](https://open-meteo.com)
 (CC BY 4.0).
