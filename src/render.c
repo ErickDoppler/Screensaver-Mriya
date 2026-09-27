@@ -45,7 +45,7 @@ extern const char shader_common_glsl[], shader_atmosphere_glsl[], shader_terrain
  * Everything else is relative to it; the pre-exposure below keeps a moonlit
  * scene and a noon one in the same comfortable range of the float target. */
 #define SUN_ILLUM 12.f
-#define MOON_FRACTION (1.f / 1500.f)
+#define MOON_FRACTION (1.f / 2600.f)
 
 /* The first reason start-up failed, for the message the user sees. */
 static char g_fail[256];
@@ -1147,7 +1147,9 @@ void render_frame(Renderer *r, const Frame *f) {
         u2f(p, "uFullRes", (float)r->w, (float)r->h);
         u1f(p, "uFrame", (float)(r->frame_index % 64u));
         glUniform1i(loc(p, "uSteps"), r->q.cloud_steps);
-        u1f(p, "uMaxDist", clampf(60000.f + (float)f->cam_pos.y * 8.f, 60000.f, 160000.f));
+        /* far enough that the deck fades out past where it matters, and the
+         * fade is wide: a short one bands on a deck seen at a grazing angle */
+        u1f(p, "uMaxDist", clampf(80000.f + (float)f->cam_pos.y * 12.f, 80000.f, 200000.f));
         u1f(p, "uHMin", hmin);
         u1f(p, "uHMax", hmax);
         u3v(p, "uLightDir", L.key_dir);
@@ -1285,44 +1287,28 @@ void render_frame(Renderer *r, const Frame *f) {
             glEnable(GL_DEPTH_TEST);
         }
     }
-    /* Contrails: one continuous ribbon per engine. Drawn as separate quads,
-     * each segment's own facing and width showed as a seam and a kink at
-     * every join; a strip shares its vertices, so the edge runs smoothly the
-     * whole way back. */
+    /* Contrails: a chain of overlapping puffs, close enough together to read
+     * as one rope. A flat ribbon cannot look like the photographs from near
+     * by, however it is textured: what the eye reads is a row of rounded
+     * lumps, each shaded from the sun side. */
     if (f->trails && f->trails->count > 1) {
-        static float tv[(TRAIL_SAMPLES + 1) * 2 * 8];
-        static vec3 pts[TRAIL_SAMPLES + 1];
-        static float ages[TRAIL_SAMPLES + 1], ops[TRAIL_SAMPLES + 1];
+        enum { TRAIL_PUFF_MAX = 16000 };
+        static float tv[TRAIL_PUFF_MAX * 8];
         const Trails *t = f->trails;
-        unsigned p = r->p_trail;
-        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        glUseProgram(p);
-        um4(p, "uViewProj", &vp_ac);
-        tex(p, "uProbe", 0, GL_TEXTURE_2D, r->t_probe);
-        u3v(p, "uLightDir", L.key_dir);
-        u1f(p, "uTime", f->time);
-        glBindBuffer(GL_ARRAY_BUFFER, r->trail_vbo);
-        for (int a = 0; a < 3; ++a) glEnableVertexAttribArray((GLuint)a);
-        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 32, (void *)0);
-        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 32, (void *)16);
-        glDisableVertexAttribArray(2);
-        for (int e = 0; e < TRAIL_ENGINES; ++e) {
-            /* newest to oldest, starting at the nozzle itself */
-            int m = 0;
-            pts[m] = v3_add(ac_rel, basis_apply(f->ac_basis, trail_nozzle[e]));
-            ages[m] = 0.f; ops[m] = 0.f; m++;
-            for (int k = 0; k < t->count; ++k) {
+        int n = 0;
+        for (int e = 0; e < TRAIL_ENGINES && n < TRAIL_PUFF_MAX; ++e) {
+            vec3 prev = v3_add(ac_rel, basis_apply(f->ac_basis, trail_nozzle[e]));
+            float prev_age = 0.f, prev_op = 0.f, prev_r = 2.2f;
+            for (int k = 0; k < t->count && n < TRAIL_PUFF_MAX; ++k) {
                 int i = (t->head - 1 - k + TRAIL_SAMPLES * 2) % TRAIL_SAMPLES;
                 dvec3 wpos = dv3_add(t->air[i][e], f->wind_off);
                 vec3 cur = dv3_to_v3(dv3_sub(wpos, f->cam_pos));
                 float age = f->time - t->born[i];
-                /* The wake sinks: the wing's vortex pair carries it down.
-                 * And it wanders: the air it hangs in is never still, so an
-                 * old trail is a slowly waving rope, not a ruled line. */
+                /* the wake sinks, and wanders: the air it hangs in is never
+                 * still, so an old trail is a slowly waving rope */
                 cur.y -= 0.22f * age;
                 {
-                    float wob = 0.9f * age;
-                    float ph = age * 0.55f + (float)e * 2.1f;
+                    float wob = 0.9f * age, ph = age * 0.55f + (float)e * 2.1f;
                     cur.x += wob * (sinf(ph) * 0.6f + sinf(ph * 2.7f + 1.1f) * 0.25f);
                     cur.y += wob * (sinf(ph * 1.7f + 4.3f) * 0.45f + sinf(ph * 3.9f) * 0.2f);
                     cur.z += wob * sinf(ph * 2.3f + 2.2f) * 0.3f;
@@ -1332,35 +1318,68 @@ void render_frame(Renderer *r, const Frame *f) {
                  * then a dense core that takes a minute and a half to go */
                 float op = t->strength[i] * smoothstepf(0.3f, 1.1f, age) *
                            (1.f - smoothstepf(45.f, 105.f, age));
-                pts[m] = cur; ages[m] = age; ops[m] = op; m++;
-            }
-            if (m < 3) continue;
-            int n = 0;
-            for (int i = 0; i < m; ++i) {
-                vec3 a0 = pts[i > 0 ? i - 1 : 0], a1 = pts[i + 1 < m ? i + 1 : m - 1];
-                vec3 dir = v3_norm(v3_sub(a1, a0));
-                vec3 side = v3_cross(dir, pts[i]);
-                float sl = v3_len(side);
-                side = sl > 1e-4f ? v3_scale(side, 1.f / sl) : v3(1.f, 0.f, 0.f);
-                /* Spreading: about a metre a second, so a minute-old trail
-                 * is some sixty metres across - wide enough on screen for
-                 * its billows to be seen, and still narrow enough that the
-                 * six stay separate for kilometres. */
-                float wd = 2.2f + 0.95f * ages[i];
-                for (int s = 0; s < 2; ++s) {
-                    float sg = s == 0 ? -1.f : 1.f;
-                    vec3 v = v3_add(pts[i], v3_scale(side, wd * sg));
-                    float *o = tv + n * 8;
-                    o[0] = v.x; o[1] = v.y; o[2] = v.z; o[3] = sg;
-                    o[4] = ages[i]; o[5] = ops[i]; o[6] = (float)e; o[7] = wd;
-                    n++;
+                /* spreading about a metre a second, as real trails do */
+                float rad = 2.2f + 0.95f * age;
+                if (op > 0.004f || prev_op > 0.004f) {
+                    /* Puffs along this segment, spaced by a fraction of their
+                     * own size so they overlap into a rope however near the
+                     * camera is; the new smoke is fine, the old coarse. */
+                    vec3 d = v3_sub(cur, prev);
+                    float len = v3_len(d);
+                    float step = fmaxf(0.42f * (prev_r + rad) * 0.5f, 1.2f);
+                    int m = (int)(len / step) + 1;
+                    if (m > 64) m = 64;
+                    for (int j = 0; j < m && n < TRAIL_PUFF_MAX; ++j) {
+                        float u = (float)j / (float)m;
+                        vec3 c = v3_add(prev, v3_scale(d, u));
+                        float a = prev_age + (age - prev_age) * u;
+                        float o = prev_op + (op - prev_op) * u;
+                        float rr = prev_r + (rad - prev_r) * u;
+                        if (o <= 0.004f) continue;
+                        /* every puff its own size and seed, or the rope is a
+                         * row of identical beads */
+                        unsigned h = (unsigned)(i * 6 + e) * 2654435761u + (unsigned)j * 40503u;
+                        float jit = (float)((h >> 9) & 1023u) / 1023.f;
+                        float jx = (float)((h >> 19) & 255u) / 255.f - 0.5f;
+                        float jy = (float)((h >> 3) & 255u) / 255.f - 0.5f;
+                        float pr = rr * (0.72f + 0.62f * jit);
+                        vec3 pofs = v3_add(c, v3(jx * rr * 0.5f, jy * rr * 0.5f, 0.f));
+                        float *q = tv + n * 8;
+                        q[0] = pofs.x; q[1] = pofs.y; q[2] = pofs.z; q[3] = pr;
+                        /* thin enough that a few deep make a solid rope */
+                        q[4] = o * (0.34f + 0.2f * jit) * fminf(step / (pr * 0.9f), 1.f);
+                        q[5] = (float)(h & 65535u);
+                        q[6] = a;
+                        q[7] = 0.f;
+                        n++;
+                    }
                 }
+                prev = cur; prev_age = age; prev_op = op; prev_r = rad;
             }
-            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(sizeof(float) * 8 * (size_t)n), tv, GL_STREAM_DRAW);
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, n);
         }
-        for (int a = 0; a < 2; ++a) glDisableVertexAttribArray((GLuint)a);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        if (n > 0) {
+            unsigned p = r->p_trail;
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+            glUseProgram(p);
+            um4(p, "uViewProj", &vp_ac);
+            um3(p, "uCamBasis", f->cam_basis);
+            tex(p, "uProbe", 0, GL_TEXTURE_2D, r->t_probe);
+            u3v(p, "uLightDir", L.key_dir);
+            glBindBuffer(GL_ARRAY_BUFFER, r->trail_vbo);
+            glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(sizeof(float) * 8 * (size_t)n), tv, GL_STREAM_DRAW);
+            for (int a = 0; a < 2; ++a) {
+                glEnableVertexAttribArray((GLuint)a);
+                glVertexAttribDivisor((GLuint)a, 1);
+            }
+            glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 32, (void *)0);
+            glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 32, (void *)16);
+            glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, n);
+            for (int a = 0; a < 2; ++a) {
+                glVertexAttribDivisor((GLuint)a, 0);
+                glDisableVertexAttribArray((GLuint)a);
+            }
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
     }
     /* the navigation lights */
     if (f->nav_lights) {

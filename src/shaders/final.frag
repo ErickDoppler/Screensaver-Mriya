@@ -95,7 +95,7 @@ void main() {
     float avg = texelFetch(uAdapt, ivec2(0), 0).r;
     float exposure = uKey / clamp(avg, 0.02, 50.0) * exp2(uExpBias);
     // a night scene should still look like night, however well adapted
-    exposure *= mix(1.0, 0.45, uNight);
+    exposure *= mix(1.0, 0.22, uNight);
     vec3 c = hdr * exposure;
     // Purkinje shift: in the dark the eye loses colour and leans blue
     float scot = uNight * (1.0 - smoothstep(0.02, 0.4, luma(c)));

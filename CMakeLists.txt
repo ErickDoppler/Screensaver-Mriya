@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Mriya VERSION 1.2.0 LANGUAGES C ASM)
+project(Mriya VERSION 1.2.1 LANGUAGES C ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)

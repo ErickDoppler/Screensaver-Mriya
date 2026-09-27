@@ -119,6 +119,17 @@ float side_of(vec2 p, vec2 a, vec2 b) {
 // front third, sweeping back and down and widening to a square end near the
 // back; above it, past a white gap, a thin yellow stripe that starts later.
 // Shaped off photographs of the aircraft, on both sides of every nacelle.
+// Inside the triangle a-b-c (wound anticlockwise): positive within, in
+// metres to the nearest edge.
+float in_tri(vec2 p, vec2 a, vec2 b, vec2 c) {
+    return min(min(side_of(p, a, b), side_of(p, b, c)), side_of(p, c, a));
+}
+
+// The nacelle swoosh, drawn, measured off photographs of the aircraft: a blue
+// dart with its point high near the front of the cowl, widening to a corner
+// below the middle and tapering to a point at the back; and a yellow wedge
+// sitting on the dart's upper edge, pointed at the middle and widest at the
+// back. Both sides of every nacelle.
 void swoosh(inout vec3 col, vec3 b, vec3 nb) {
     float ax = abs(b.x);
     float lipz = ax < 13.6 ? -17.24 : (ax < 20.9 ? -12.435 : -7.59);
@@ -127,20 +138,17 @@ void swoosh(inout vec3 col, vec3 b, vec3 nb) {
     float outward = sign(b.x - axis.x) * nb.x;           // facing out of this side
     if (outward < 0.15) return;
     vec2 p = vec2(b.z - lipz, b.y - axis.y);             // along from the lip, up from the axis
-    if (p.x < 1.5 || p.x > 5.2) return;
-    // blue: a point at A, the upper edge to U, the lower edge to L, cut at CUT
-    const vec2 A = vec2(1.82, 0.95), U = vec2(5.0, -0.09), L = vec2(5.04, -0.40);
-    const float CUT = 5.02;
-    // yellow: its top from Y0 to Y1; its bottom the blue's top, raised by GAP
-    const vec2 Y0 = vec2(2.2, 0.85), Y1 = vec2(4.97, 0.13);
-    const float GAP = 0.07;
-    float du = side_of(p, A, U);                         // > 0 above the blue's top
-    float dl = side_of(p, A, L);                         // > 0 above the blue's bottom
-    float dc = CUT - p.x;                                // > 0 forward of the cut
-    float dy = side_of(p, Y0, Y1);                       // > 0 above the yellow's top
+    if (p.x < 0.2 || p.x > 5.3) return;                  // the cowl is 5.1 m long
+    // Measured off the photographs, in metres from the intake lip and from
+    // the engine's axis. Both marks are darts pointed at each end: the blue
+    // widest about a third of the way back, the yellow slimmer and widest
+    // near the middle, sitting above it. The white gap between them comes
+    // out of the two shapes, hairline at the front and wide at the back.
+    const vec2 A = vec2(0.75, 0.98), B = vec2(2.04, -0.065), C = vec2(4.68, -0.57);
+    const vec2 Yf = vec2(1.08, 0.92), Yb = vec2(2.90, 0.15), Yr = vec2(4.68, -0.23);
     float w = max(fwidth(p.x) + fwidth(p.y), 0.004) * 0.6;
-    float blu = smoothstep(-w, w, dl) * smoothstep(-w, w, -du) * smoothstep(-w, w, dc);
-    float yel = smoothstep(-w, w, du - GAP) * smoothstep(-w, w, -dy) * smoothstep(-w, w, dc);
+    float blu = smoothstep(-w, w, in_tri(p, A, B, C));
+    float yel = smoothstep(-w, w, in_tri(p, Yf, Yb, Yr));
     float fade = smoothstep(0.15, 0.35, outward);
     col = mix(col, vec3(0.67, 0.55, 0.02), yel * fade);
     col = mix(col, vec3(0.054, 0.11, 0.33), blu * fade);

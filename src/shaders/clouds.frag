@@ -146,11 +146,11 @@ void main() {
             float hf;
             // the fine detail fades out with distance rather than stopping
             // at a line, which would ring the camera in a change of tone
-            float d = cloud_density(p, smoothstep(45000.0, 15000.0, t), hf);
+            float d = cloud_density(p, smoothstep(70000.0, 10000.0, t), hf);
             // and the deck itself thins away over the last quarter of the
             // march: stopping at the limit leaves its far edge as a hard
             // stepped line across the sky
-            d *= smoothstep(uMaxDist, uMaxDist * 0.72, t);
+            d *= smoothstep(uMaxDist, uMaxDist * 0.4, t);
             float rd_ = rain_density(p);
             if (d > 0.0 || rd_ > 0.0) {
                 float sigma = d * CLOUD_EXT + rd_;

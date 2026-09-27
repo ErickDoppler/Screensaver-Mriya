@@ -1,23 +1,33 @@
-// A contrail: one continuous ribbon per engine, its vertices already placed
-// to either side of the trail by the renderer (a strip, so no seam at a join).
-layout(location = 0) in vec4 aPos;    // xyz camera-relative, w side (-1 / +1)
-layout(location = 1) in vec4 aInfo;   // age (s), opacity, engine, half-width
+// One puff of a contrail: a camera-facing quad, many of them overlapping
+// along each engine's trail.
+layout(location = 0) in vec4 aPos;    // xyz centre (camera-relative), w radius
+layout(location = 1) in vec4 aInfo;   // opacity, seed, age, spare
 
 uniform mat4 uViewProj;
+uniform mat3 uCamBasis;               // columns: right, up, back
+uniform vec3 uLightDir;               // the way the light travels
 
-out float vAcross;    // -1 at one edge, +1 at the other
+out vec2  vQuad;      // -1..1 across the puff
 out float vAlpha;
-out float vAge;
 out float vSeed;
-out float vWidth;
+out float vAge;
+out vec2  vSunXY;     // where the sun is, in the quad's own axes
 out vec3  vRel;
 
 void main() {
-    gl_Position = uViewProj * vec4(aPos.xyz, 1.0);
-    vAcross = aPos.w;
-    vAge = aInfo.x;
-    vAlpha = aInfo.y;
-    vSeed = aInfo.z;
-    vWidth = aInfo.w;
+    int corner = gl_VertexID;
+    vec2 q = vec2((corner & 1) == 0 ? -1.0 : 1.0, (corner & 2) == 0 ? -1.0 : 1.0);
+    vec3 right = vec3(uCamBasis[0][0], uCamBasis[0][1], uCamBasis[0][2]);
+    vec3 up    = vec3(uCamBasis[1][0], uCamBasis[1][1], uCamBasis[1][2]);
+    vec3 c = aPos.xyz + (right * q.x + up * q.y) * aPos.w;
+    gl_Position = uViewProj * vec4(c, 1.0);
+    vQuad = q;
+    vAlpha = aInfo.x;
+    vSeed = aInfo.y;
+    vAge = aInfo.z;
+    // the sun's direction flattened onto the quad: which side of each puff
+    // is lit, and which is in its own shadow
+    vec2 sxy = vec2(dot(-uLightDir, right), dot(-uLightDir, up));
+    vSunXY = length(sxy) > 1e-4 ? normalize(sxy) : vec2(0.0, 1.0);
     vRel = aPos.xyz;
 }
