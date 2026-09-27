@@ -217,7 +217,7 @@ void flight_set_autopilot(Flight *f, int on) {
 }
 
 void flight_update(Flight *f, const Settings *s, const TerrainParams *t,
-                   const FlightInput *in, double dt_total, float turb, dvec3 wind) {
+                   const FlightInput *in, double dt_total, float turb, float in_cloud, dvec3 wind) {
     f->mass = s->mass_t * 1000.0;       /* the weight is a setting */
 
     /* --- who has the controls ------------------------------------------ */
@@ -289,20 +289,25 @@ void flight_update(Flight *f, const Settings *s, const TerrainParams *t,
         double n_stall = CLMAX * q * WING_AREA / w;      /* most lift available */
 
         /* --- turbulence -------------------------------------------------- */
-        /* Calm air is calm: hundreds of tonnes and an 88 m wing average the small
-         * eddies away, so nothing moves until the weather is rough, and even
-         * then the airframe answers slowly - long, heavy swells, and only in
-         * real turbulence a shudder on top. */
-        float tq = turb * turb;
+        /* Calm air is calm: hundreds of tonnes and an 88 m wing average the
+         * small eddies away, so nothing moves until the weather is rough, and
+         * even then the airframe answers slowly, in long heavy swells. And
+         * only the air it is actually in moves it: a storm two kilometres
+         * below is somebody else's weather. */
+        float rough = turb * clampf(in_cloud, 0.f, 1.f);
+        float tq = rough * rough;
         float gv = gust(f, 0, 2.5f, dt) * 3.0f * tq;     /* vertical gust, m/s */
-        f->gust_roll  = gust(f, 1, 3.5f, dt) * DEG2RAD(3.0f * tq);
-        f->gust_yaw   = gust(f, 2, 4.0f, dt) * DEG2RAD(0.8f * tq);
-        f->gust_pitch = gust(f, 3, 2.5f, dt) * DEG2RAD(0.6f * tq);
+        /* The airframe is not thrown about: three hundred tonnes and an 88 m
+         * wing do not judder. What is left are long, slow swells, a quarter
+         * of what they were, and what they mostly do is work the wings. */
+        f->gust_roll  = gust(f, 1, 3.5f, dt) * DEG2RAD(0.75f * tq);
+        f->gust_yaw   = gust(f, 2, 4.0f, dt) * DEG2RAD(0.2f * tq);
+        f->gust_pitch = gust(f, 3, 2.5f, dt) * DEG2RAD(0.15f * tq);
         /* a gust changes the angle of attack, and so the lift, before the
-         * aircraft can do anything about it */
+         * aircraft can do anything about it: this is what bends the wings */
         f->gust_n = (float)(CLA * (gv / v) * q * WING_AREA / w);
-        f->chop = smoothstepf(0.45f, 1.f, turb);
-        f->chop *= f->chop;
+        /* and nothing shudders: the shake is gone from the camera */
+        f->chop = 0.f;
 
         /* --- targets ------------------------------------------------------ */
         double bank_cmd, gamma_cmd;

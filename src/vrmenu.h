@@ -3,6 +3,9 @@
  *
  * It draws itself into a texture with the HUD's own text engine, and the
  * renderer hangs that texture on a quad in the world, the same for both eyes.
+ *
+ * The same menu serves the screensaver on a monitor, where F2 puts it up in
+ * the middle of the screen and the mouse works it: see vrmenu_paint_screen.
  */
 #ifndef MR_VRMENU_H
 #define MR_VRMENU_H
@@ -11,6 +14,8 @@
 
 typedef struct VrMenu {
     int      open;
+    int      on_screen;         /* on a monitor, not hanging in the world */
+    int      place_pending;     /* hang it in front of the head, next frame */
     int      page;              /* 0 top, 1 cameras, 2 scenery, 3 settings */
     int      hover;             /* the item the pointer is on, -1 for none */
     int      scroll;            /* first item shown, for the long lists */
@@ -33,13 +38,17 @@ enum {
     VRMENU_QUALITY,             /* value: 0..100 */
     VRMENU_AUTOPILOT,           /* value: seconds */
     VRMENU_LENS,                /* value: which lens */
+    VRMENU_RT_DAYLIGHT,         /* the place's own daylight, on or off */
+    VRMENU_RT_WEATHER,          /* the place's own weather, on or off */
+    VRMENU_TIME_OF_DAY,         /* value: minutes past midnight */
     VRMENU_EXIT                 /* leave the screensaver */
 };
 
 /* The lens types the settings page offers, in order. */
 enum { LENS_PORTRAIT, LENS_NORMAL, LENS_TELE, LENS_WIDE, LENS_FISHEYE, LENS_COUNT };
 const char *vrmenu_lens_name(int lens);
-/* How much of the view a lens shows: 1 is the headset's own. */
+/* A lens is a magnification of the virtual camera: 1 shows what the headset
+ * itself sees, 2 shows half as much of the world across the same display. */
 float vrmenu_lens_zoom(int lens);
 
 int  vrmenu_init(VrMenu *m);
@@ -60,4 +69,13 @@ int  vrmenu_drag(VrMenu *m, float u, float v, int *value);
 void vrmenu_release(VrMenu *m);
 /* Redraws the panel's texture. */
 void vrmenu_paint(VrMenu *m, const Settings *s, int hud_on, int camera, int scene, int lens);
+
+/* The same menu on a monitor: F2 puts it up in the middle of the screen and
+ * the mouse works it. It is drawn straight onto the window, over the finished
+ * frame, and the pointer is the mouse rather than a ray. */
+void vrmenu_paint_screen(VrMenu *m, const Settings *s, int hud_on, int camera, int scene,
+                         int lens, int win_w, int win_h);
+/* Where the mouse is on the page, 0..1. Returns 0 when it is off the panel. */
+int  vrmenu_screen_uv(const VrMenu *m, int win_w, int win_h, float mx, float my,
+                      float *u, float *v);
 #endif

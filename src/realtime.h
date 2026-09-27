@@ -20,6 +20,12 @@ void realtime_sky(double lat, double lon, time_t utc, float *sun_elev, float *su
  * like "Kyiv, Ukraine" and the coordinates; returns 1 if found. */
 int realtime_geocode(const char *query, char *name, int name_cap, double *lat, double *lon);
 
+/* The same lookup off the main thread, for when there is nobody to wait: in
+ * a headset the city may be saved with no coordinates beside it, because the
+ * dialog's Find was never pressed. Poll until it answers. */
+void realtime_geocode_async(const char *query);
+int  realtime_geocode_poll(char *name, int name_cap, double *lat, double *lon);
+
 /* The live weather, fetched in the background. */
 void realtime_start(double lat, double lon);
 void realtime_stop(void);

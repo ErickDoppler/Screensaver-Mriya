@@ -21,6 +21,7 @@
  *   --seed <n>                       fix the run's random seed
  *   --trace                          log the flight every 15 frames
  *   --show-keys                      start with the F1 key list shown
+ *   --show-menu [page]               start with the F2 settings panel shown
  *   --stick <pitch> <roll> <from> <to>  hold the stick between two times (s)
  *   --log <file>                     append diagnostics to a file
  *   --<setting> <value>              override any setting (see settings.h)
@@ -116,6 +117,13 @@ int main(int argc, char **argv) {
         if (!strcmp(opt, "seed") && i + 1 < argc)    { cfg.seed = (unsigned)strtoul(argv[++i], NULL, 0); continue; }
         if (!strcmp(opt, "trace")) { cfg.trace = 1; continue; }
         if (!strcmp(opt, "show-keys")) { cfg.show_keys = 1; continue; }
+        if (!strcmp(opt, "show-menu")) {
+            cfg.show_menu = 1;
+            /* optionally the page to start on: 3 is the settings page */
+            if (i + 1 < argc && isdigit((unsigned char)argv[i + 1][0]))
+                cfg.show_menu = 1 + atoi(argv[++i]);
+            continue;
+        }
         if (!strcmp(opt, "stick") && i + 4 < argc) {
             for (int k = 0; k < 4; ++k) cfg.stick[k] = (float)atof(argv[++i]);
             cfg.stick_given = 1;

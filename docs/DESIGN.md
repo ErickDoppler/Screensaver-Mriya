@@ -83,8 +83,13 @@ the thrust left over after drag runs out.
   what the aircraft could climb in the distance left. Coming down onto it, a
   predicted pull-out height decides when it takes the pitch over, gradually;
   climbing is always the pilot's.
-* **Turbulence** is only felt in rough weather: slow heavy swells, a shudder
-  only in real storms.
+* **Turbulence** is only felt where the weather is. `cloud_immersion`
+  (`src/app.c`) asks how much of the aircraft is in a layer that has any
+  cover, softened over 120 m at the base and the top, and under the lowest
+  cloud when something is falling out of it. That number gates the rough air:
+  in cloud in a storm the wings work and the glass beads over; above the same
+  storm's deck there is neither. The aircraft is not shaken about in any
+  weather - a heavy freighter does not judder - only the wings bend.
 
 ## Weather
 
@@ -101,3 +106,40 @@ astronomy and the clock, and the current conditions from Open-Meteo, fetched
 on a background thread every fifteen minutes and turned into a scenario - the
 weather code picks the kind, cloud cover by level sets the layers, and the
 visibility, precipitation, wind and temperature set the rest.
+The daylight and the weather are asked for separately: with the hour set by
+hand the sky is lit for that minute of today over the same place, and with the
+live weather the scenery rotation moves the aircraft to new ground instead of
+dealing a new sky.
+
+## VR
+
+`src/vr.c`: OpenXR without the loader library. The active runtime is read from
+the registry (`ActiveRuntime`), its JSON gives the DLL, and the DLL is asked
+for `xrNegotiateLoaderRuntimeInterface` - the Oculus runtime exports nothing
+else. From there it is an ordinary session: `XR_KHR_opengl_enable`, two
+swapchains, an action set bound to the Touch and the Simple Controller
+profiles, and a projection layer whose `fov` is handed back exactly as the
+runtime gave it.
+
+* **Stereo.** Each eye is drawn with an asymmetric frustum built from the four
+  tangents the runtime reports. Everything that does not depend on the eye -
+  the atmosphere tables, the weather map, the shadows, the exposure - is done
+  once a frame; the clouds keep a history per eye.
+* **Zoom** is the virtual camera's field of view, not the layer's: the four
+  tangents are divided by the magnification, so a narrower view is rendered
+  across the whole eye texture. The runtime still gets its own `fov`, so head
+  tracking and the lenses are untouched.
+* **Comfort.** The mount keeps the aircraft's heading and only a tenth of its
+  roll and pitch, so a turn is felt without the horizon going over, and
+  nothing moves the view on its own: the mount's wander, the turbulence sway,
+  the globe's drift, the gaze easing and the camera rotation on its timer are
+  all held while a headset is on (`camera_hold_gaze`). On a monitor they all
+  still run - that is what a screensaver is.
+* **The UI in the world.** The menu and the flight HUD are drawn with the
+  HUD's own text engine into textures and hung on quads (`src/vrmenu.c`,
+  `src/shaders/panel.*`), after the final present pass so they are not fogged,
+  bloomed or tone-mapped. The HUD hangs on the glass ahead, squared to the
+  aircraft rather than to the head. The menu is placed in front of the head
+  each time it is put up. The same pages are drawn straight onto the window
+  for the screensaver's F2 panel, by the same layout code, so the two cannot
+  drift apart.

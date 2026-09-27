@@ -37,7 +37,10 @@ are written, but not yet tested on Linux.**
   ranges, the sea flooding in - then it holds for five.
 * **Real time.** Give it a city and it flies in that place's daylight, sun and
   moon, and its live weather (from [Open-Meteo](https://open-meteo.com), no
-  account needed; only the place is sent).
+  account needed; only the place is sent). The two are separate: take the
+  daylight and keep the scenery's own weather, take the weather and set the
+  hour yourself, or both. With the live weather the scenery change moves the
+  aircraft to new ground rather than bringing a new sky.
 * **The aircraft** is a detailed model in the Antonov Airlines livery, drawn
   procedurally so every line is sharp at any distance: the cheatline measured
   off a reference texture, the titles set in type, glass windscreen panes,
@@ -48,12 +51,14 @@ are written, but not yet tested on Linux.**
   stick asks for a pitch rate (3 deg/s slow, 10 deg/s from 540 km/h), the
   ceiling is wherever the thrust runs out, and a terrain floor 50 m above the
   ground takes over gently if you dive at it.
-* **VR (in progress).** With a headset plugged in it goes stereo through
-  OpenXR, which both the Oculus runtime and SteamVR speak; no loader library
-  is shipped, the active runtime is found and loaded at start-up. The
-  controllers turn and move the camera, change the scenery and the camera,
-  and put up a menu panel in the world. Tested on a Quest 2; rough edges
-  remain.
+* **VR.** With a headset plugged in it goes stereo through OpenXR, which both
+  the Oculus runtime and SteamVR speak; no loader library is shipped, the
+  active runtime is found and loaded at start-up. The controllers turn, move
+  and zoom the camera, change the scenery and the camera, and put up a menu
+  panel in the world; the flight HUD hangs on the glass ahead, pointing where
+  the aircraft is going. Nothing moves the view by itself in a headset, and
+  the horizon keeps only a tenth of the aircraft's roll and pitch. Tested on
+  a Quest 2.
 * **Thirteen cameras**, four views on most: the nose (with a flight HUD), the
   cockpit roof, the spine, the fin top, a wingtip, the side window, the chin,
   behind an engine, between the engines, the tailplane, a chase plane, a
@@ -196,7 +201,15 @@ Press **F1** at any time for this list on screen.
 | H | flight HUD on / off |
 | Print Screen | save the frame to `Pictures\Mriya` and copy it to the clipboard |
 | F1 | the key list |
+| F2 | the settings panel: quality, real weather, real daylight, time of day, cameras, scenery |
 | Esc | exit (always) |
+
+**The settings panel (F2)** is the same menu the headset has, in the middle of
+the screen, worked with the mouse: click a row, drag a slider, the wheel runs
+down the long lists, Escape or F2 puts it away. While it is up the screensaver
+will not quit at a touch. Quality set by hand switches off the automatic
+adjustment for the rest of the run; nothing chosen there is written to the
+saved settings, which stay as the settings dialog left them.
 
 **Joystick.** X and Y fly roll and pitch, a twist grip is the rudder and the
 throttle lever sets the power. The first half of the stick's travel gives only
@@ -204,6 +217,27 @@ a tenth of the authority, for fine control, rising to all of it at the stops.
 Button 2 toggles the autopilot. With a joystick connected the autopilot never
 takes over just because you stopped touching things - only when you ask, or
 when the ground is coming. Each axis can be inverted in the settings.
+
+**In a headset** the controllers fly nothing - the aircraft flies itself, or
+the joystick flies it - and work the view instead:
+
+| Control | Action |
+|---|---|
+| Stick left / right | turn the view |
+| Stick forward / back | zoom: the virtual camera's field of view narrows across the whole eye, and head tracking is untouched |
+| Grip (middle finger) | grab the view and turn it |
+| Grip + stick left / right | the scenery, one way or the other |
+| Trigger (index finger) | grab the camera and slide it: any direction |
+| Trigger + stick | turn the view and zoom, as the stick alone |
+| Grip and trigger together | let go: back to where the camera's preset has it |
+| A / X | the next camera |
+| B / Y | the menu, and away again |
+| Trigger on the panel | work a row or a slider |
+| Alt+F4 | exit - a mouse button or Escape will not, in a headset |
+
+The menu appears in front of wherever you are looking, and its **Settings**
+page has the quality, the autopilot's timeout, the lens (Portrait, Normal,
+Telescopic, Wide, Fisheye), the real daylight and weather, and the hour.
 
 **The autopilot** flies a racetrack: 1000 km straight, a right turn 40 km
 across, 1000 km back, picking a new altitude between 1000 and 11,000 m every
@@ -304,6 +338,7 @@ Developer switches (both platforms):
 | `--seed 1234` | fix the run's random seed |
 | `--stick pitch roll from to` | hold the stick between two times, for testing the handling |
 | `--show-keys` | start with the F1 key list up |
+| `--show-menu [page]` | start with the F2 settings panel up (3 = its settings page) |
 | `--trace` | log the flight |
 | `--log file.txt` | append diagnostics to a file |
 | `--<setting> <value>` | override any setting, e.g. `--weight 640 --time-scale 10` |
@@ -325,7 +360,8 @@ Setting keys (see `src/settings.h` for ranges and defaults):
 `exit-on-any-key`, `manual-flight`, `autopilot-resume`, `joy-invert-roll`,
 `joy-invert-pitch`, `joy-invert-throttle`, `joy-invert-rudder`,
 `weather-minutes`, `camera-minutes`, `scene-mask` (e.g. `sunset,aurora`),
-`real-time`, `rt-lat`, `rt-lon`, `camera-mask`, `leg-km`, `turn-km`,
+`real-time`, `rt-lat`, `rt-lon`, `rt-daylight`, `rt-weather`, `time-of-day`
+(minutes past midnight), `camera-mask`, `leg-km`, `turn-km`,
 `altitude-change-km`, `time-scale`, `weight`, `fov`, `bloom`,
 `lens-effects`, `nav-lights`, `hud`, `units`, `quality` (0 = auto), `fps`.
 Boolean settings also take `--no-<key>`.

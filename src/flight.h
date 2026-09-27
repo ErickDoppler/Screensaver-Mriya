@@ -89,10 +89,13 @@ typedef struct Flight {
 } Flight;
 
 void flight_init(Flight *f, const Settings *s, unsigned seed, double altitude, int leg_eastbound);
-/* Advances by dt seconds of simulated time (already scaled). `turb` 0..1,
+/* Advances by dt seconds of simulated time (already scaled). `turb` 0..1 is
+ * how rough the weather is, `in_cloud` 0..1 how much of the aircraft is in
+ * it: above a deck the air is smooth however hard it is raining below, so
+ * the two together decide whether the wings work against the gusts at all.
  * `wind` in m/s blowing towards (x, z). */
 void flight_update(Flight *f, const Settings *s, const TerrainParams *t,
-                   const FlightInput *in, double dt, float turb, dvec3 wind);
+                   const FlightInput *in, double dt, float turb, float in_cloud, dvec3 wind);
 /* Engages (1) or releases (0) the autopilot right away. */
 void flight_set_autopilot(Flight *f, int on);
 /* Gives the autopilot a new altitude to fly to (the scenery is changing). */

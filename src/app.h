@@ -31,6 +31,7 @@ typedef struct AppConfig {
     float       stick[4];       /* --stick pitch roll from to: hold the stick (tests) */
     int         stick_given;
     int         show_keys;      /* --show-keys: start with the F1 panel up */
+    int         show_menu;      /* --show-menu: start with the F2 settings panel up */
 } AppConfig;
 
 int app_run(const AppConfig *cfg);

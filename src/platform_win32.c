@@ -275,6 +275,7 @@ static void set_num(HWND dlg, int id, const wchar_t *suffix, int v) {
 
 /* Real time: the place, as found, and what the status line says about it. */
 static char g_place[256];
+static int  rt_looked_up;      /* Find answered for the name now in the box */
 
 static void rt_status(HWND dlg, const char *msg) {
     wchar_t w[400];
@@ -306,6 +307,7 @@ static void rt_find(HWND dlg) {
     SetCursor(old);
     if (!ok) { rt_status(dlg, "Not found (or no connection). Try the city's name in English."); return; }
     snprintf(g_place, sizeof g_place, "%s", name);
+    rt_looked_up = 1;
     g_s.rt_lat = (int)lround(lat * 1e4);
     g_s.rt_lon = (int)lround(lon * 1e4);
     MultiByteToWideChar(CP_UTF8, 0, g_place, -1, w, 256);
@@ -348,6 +350,11 @@ static void refresh_labels(HWND dlg) {
     if (g_s.camera_minutes == 0) set_text(dlg, IDC_CAMMIN_VAL, L"never");
     else set_num(dlg, IDC_CAMMIN_VAL, L" min", g_s.camera_minutes);
     set_num(dlg, IDC_FOV_VAL, L"\x00B0", g_s.fov_deg);
+    {   /* the hour, as a clock rather than a count of minutes */
+        wchar_t t[16];
+        wsprintfW(t, L"%02d:%02d", g_s.time_of_day / 60, g_s.time_of_day % 60);
+        set_text(dlg, IDC_TOD_VAL, t);
+    }
     set_num(dlg, IDC_BLOOM_VAL, L" %", g_s.bloom);
     if (g_s.quality == 0) set_text(dlg, IDC_QUALITY_VAL, L"auto");
     else set_num(dlg, IDC_QUALITY_VAL, L" %", g_s.quality);
@@ -369,8 +376,12 @@ static void refresh_dependencies(HWND dlg) {
     enable_group(dlg, sens_group, 3, get_check(dlg, IDC_EXITMOUSE));
     static const int ap_group[] = { IDC_APRES_LBL, IDC_APRES, IDC_APRES_VAL };
     enable_group(dlg, ap_group, 3, get_check(dlg, IDC_MANUAL));
-    static const int rt_group[] = { IDC_RT_CITY, IDC_RT_FIND, IDC_RT_PLACE };
-    enable_group(dlg, rt_group, 3, get_check(dlg, IDC_RT));
+    static const int rt_group[] = { IDC_RT_CITY, IDC_RT_FIND, IDC_RT_PLACE,
+                                    IDC_RT_DAYLIGHT, IDC_RT_WEATHER };
+    enable_group(dlg, rt_group, 5, get_check(dlg, IDC_RT));
+    /* the hour is the user's own only when the place's daylight is not used */
+    static const int tod_group[] = { IDC_TOD, IDC_TOD_VAL, IDC_TOD_LABEL };
+    enable_group(dlg, tod_group, 3, !get_check(dlg, IDC_RT) || !get_check(dlg, IDC_RT_DAYLIGHT));
 }
 
 static void settings_to_controls(HWND dlg) {
@@ -394,6 +405,9 @@ static void settings_to_controls(HWND dlg) {
     set_check(dlg, IDC_NAVLIGHTS, g_s.nav_lights);
     set_check(dlg, IDC_LENS, g_s.lens_effects);
     set_check(dlg, IDC_RT, g_s.real_time);
+    set_check(dlg, IDC_RT_DAYLIGHT, g_s.rt_daylight);
+    set_check(dlg, IDC_RT_WEATHER, g_s.rt_weather);
+    set_slider(dlg, IDC_TOD, 0, 1439, g_s.time_of_day);
     set_check(dlg, IDC_JOY_INV_ROLL, g_s.joy_inv_roll);
     set_check(dlg, IDC_JOY_INV_PITCH, g_s.joy_inv_pitch);
     set_check(dlg, IDC_JOY_INV_THR, g_s.joy_inv_throttle);
@@ -417,6 +431,21 @@ static void settings_to_controls(HWND dlg) {
 }
 
 static void controls_to_settings(HWND dlg) {
+    {   /* Whatever is typed in the city box is kept, looked up or not: in a
+         * headset there is no Find to press, so the screensaver looks up
+         * whatever name it was left with. A new name loses the old
+         * coordinates, or the old place would go on being used. */
+        wchar_t w[256];
+        char typed[256];
+        GetDlgItemTextW(dlg, IDC_RT_CITY, w, 256);
+        WideCharToMultiByte(CP_UTF8, 0, w, -1, typed, sizeof typed, NULL, NULL);
+        if (strcmp(typed, g_place) != 0) {
+            snprintf(g_place, sizeof g_place, "%s", typed);
+            if (!typed[0]) { g_s.rt_lat = 0; g_s.rt_lon = 0; }
+            else if (!rt_looked_up) { g_s.rt_lat = 0; g_s.rt_lon = 0; }
+        }
+        rt_looked_up = 0;
+    }
     g_s.mouse_rotation     = get_check(dlg, IDC_MOUSEROT);
     g_s.exit_on_mouse_move = get_check(dlg, IDC_EXITMOUSE);
     g_s.mouse_sensitivity  = get_slider(dlg, IDC_SENS);
@@ -437,6 +466,9 @@ static void controls_to_settings(HWND dlg) {
     g_s.nav_lights         = get_check(dlg, IDC_NAVLIGHTS);
     g_s.lens_effects       = get_check(dlg, IDC_LENS);
     g_s.real_time          = get_check(dlg, IDC_RT);
+    g_s.rt_daylight        = get_check(dlg, IDC_RT_DAYLIGHT);
+    g_s.rt_weather         = get_check(dlg, IDC_RT_WEATHER);
+    g_s.time_of_day        = get_slider(dlg, IDC_TOD);
     g_s.joy_inv_roll       = get_check(dlg, IDC_JOY_INV_ROLL);
     g_s.joy_inv_pitch      = get_check(dlg, IDC_JOY_INV_PITCH);
     g_s.joy_inv_throttle   = get_check(dlg, IDC_JOY_INV_THR);

@@ -45,14 +45,16 @@ typedef struct Frame {
     unsigned target_fbo;
     /* The headset's menu: a page on a quad in the world, and the pointer rays
      * from the controllers. All in the camera's frame, metres. */
-    unsigned ui_tex;
-    vec3     ui_pos;
-    basis3   ui_basis;
+    unsigned ui_tex, ui2_tex;
+    vec3     ui_pos, ui2_pos;
+    basis3   ui_basis, ui2_basis;
     float    ui_w, ui_h, ui_alpha;
+    float    ui2_w, ui2_h, ui2_alpha;
     vec3     ray_from[2], ray_to[2];
     int      ray_on[2];
     int    cam_external;
     int    cam_on_airframe;
+    float  in_cloud;            /* the aircraft is in the weather, 0..1 */
     dvec3  ac_pos;
     basis3 ac_basis;
     vec3   ac_vel;             /* world, m/s */
@@ -154,6 +156,10 @@ const char *render_failure(void);
 unsigned char *render_read_rgba(const Renderer *r, int *w, int *h);
 int  render_write_png(const char *path, const unsigned char *rgba, int w, int h);
 Quality render_quality(int setting);
+/* A headset asks for more of the clouds than a monitor does: they are looked
+ * at closely, they never sit still, and a coarse cloud buffer shows as a mesh
+ * over the distance. */
+void render_quality_for_vr(int on);
 /* Builds a program from source pieces; "#version 330 core" goes first. */
 unsigned render_program(const char *const *vs, int nvs, const char *const *fs, int nfs, const char *name);
 /* Projects a world direction to screen uv; returns 0 if behind the camera. */

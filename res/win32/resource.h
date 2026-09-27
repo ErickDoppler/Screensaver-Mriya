@@ -71,6 +71,11 @@
 #define IDC_RT_CITY       1061
 #define IDC_RT_FIND       1062
 #define IDC_RT_PLACE      1063
+#define IDC_RT_DAYLIGHT   1064
+#define IDC_RT_WEATHER    1065
+#define IDC_TOD           1066
+#define IDC_TOD_VAL       1067
+#define IDC_TOD_LABEL     1068
 
 /* Joystick */
 #define IDC_JOY_NAME      1064

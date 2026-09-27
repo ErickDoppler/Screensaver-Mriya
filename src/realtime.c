@@ -257,6 +257,44 @@ static int SDLCALL fetch_thread(void *unused) {
     return 0;
 }
 
+/* ---- the lookup, on a thread of its own ---------------------------------- */
+static SDL_Thread *g_geo_thread;
+static char   g_geo_query[256], g_geo_name[256];
+static double g_geo_lat, g_geo_lon;
+static int    g_geo_done, g_geo_ok;
+
+static int geocode_thread(void *unused) {
+    (void)unused;
+    double lat = 0.0, lon = 0.0;
+    char name[256] = "";
+    int ok = realtime_geocode(g_geo_query, name, sizeof name, &lat, &lon);
+    snprintf(g_geo_name, sizeof g_geo_name, "%s", name);
+    g_geo_lat = lat; g_geo_lon = lon;
+    g_geo_ok = ok;
+    SDL_CompilerBarrier();
+    g_geo_done = 1;
+    return 0;
+}
+
+void realtime_geocode_async(const char *query) {
+    if (g_geo_thread || !query || !query[0]) return;
+    snprintf(g_geo_query, sizeof g_geo_query, "%s", query);
+    g_geo_done = g_geo_ok = 0;
+    g_geo_thread = SDL_CreateThread(geocode_thread, "geocode", NULL);
+    if (!g_geo_thread) plat_log("real time: cannot look the city up (%s)", SDL_GetError());
+}
+
+int realtime_geocode_poll(char *name, int name_cap, double *lat, double *lon) {
+    if (!g_geo_thread || !g_geo_done) return 0;
+    SDL_WaitThread(g_geo_thread, NULL);
+    g_geo_thread = NULL;
+    if (!g_geo_ok) { plat_log("real time: %s was not found", g_geo_query); return -1; }
+    snprintf(name, (size_t)name_cap, "%s", g_geo_name);
+    *lat = g_geo_lat; *lon = g_geo_lon;
+    plat_log("real time: %s is at %.3f, %.3f", name, *lat, *lon);
+    return 1;
+}
+
 void realtime_start(double lat, double lon) {
     if (g_thread) return;
     g_lat = lat; g_lon = lon;

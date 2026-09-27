@@ -194,8 +194,11 @@ void camera_update(CamState *c, const Settings *s, const Flight *f, float dt, in
     if (idle) c->since_change += dt;
     c->look_idle += dt;
 
-    /* the automatic rotation */
-    if (s->camera_minutes > 0 && c->pending < 0 && c->since_change > s->camera_minutes * 60.f)
+    /* The automatic rotation - a screensaver's, not a headset's. In VR it was
+     * what reset the view after a few minutes of not touching the
+     * controllers: a new camera comes with the look-around cleared. */
+    if (s->camera_minutes > 0 && c->pending < 0 && !c->hold_gaze &&
+        c->since_change > s->camera_minutes * 60.f)
         camera_next(c, s);
     /* the cut: fade down, switch, fade up */
     if (c->pending >= 0) {
@@ -280,6 +283,8 @@ void camera_update(CamState *c, const Settings *s, const Flight *f, float dt, in
                 0.035f * chop;
     jitter.x += sinf(t * 1.9f + c->shake_phase[1]) * 0.02f * chop;
     if (m->external) jitter = v3_scale(jitter, 0.f);
+    /* A shaking camera in a headset is a shaking room: damped right down. */
+    if (c->hold_gaze) jitter = v3_scale(jitter, 0.2f);
 
     vec3 local = v3_add(mp, jitter);
     dvec3 offset = dbasis_apply(att, v3_to_dv3(local));
@@ -301,10 +306,14 @@ void camera_update(CamState *c, const Settings *s, const Flight *f, float dt, in
         yaw = DEG2RAD(vy);
         pitch = DEG2RAD(vp);
     }
-    float dr = DEG2RAD(m->drift);
+    /* Every mount wanders a little on its own, which is what stops a
+     * screensaver looking like a still. In a headset that same drift is the
+     * view sliding out from under the head, so it is switched off there. */
+    float dr = c->hold_gaze ? 0.f : DEG2RAD(m->drift);
     yaw += wander(t, 1.3f) * dr + c->look_yaw;
     pitch += wander(t, 4.1f) * dr * 0.45f + c->look_pitch;
-    pitch += (sinf(t * 2.9f + c->shake_phase[3]) * 0.5f + sinf(t * 4.3f) * 0.5f) * 0.004f * chop;
+    if (!c->hold_gaze)
+        pitch += (sinf(t * 2.9f + c->shake_phase[3]) * 0.5f + sinf(t * 4.3f) * 0.5f) * 0.004f * chop;
 
     basis3 look = basis_yaw_pitch(yaw, pitch);
     if (roll_extra != 0.f) look = basis_mul(basis_roll(roll_extra), look);
@@ -324,6 +333,22 @@ void camera_update(CamState *c, const Settings *s, const Flight *f, float dt, in
             att_level.y = v3_cross(att_level.z, att_level.x);
         }
         c->basis = basis_mul(att_level, look);
+    } else if (c->hold_gaze) {
+        /* In a headset the aircraft's own banking and pitching would tip the
+         * whole room: the mount keeps the aircraft's heading, and only a
+         * tenth of its roll and pitch, so a turn is felt without the horizon
+         * going over. On a monitor it rolls fully, as it always has. */
+        vec3 fwd = v3_scale(attf.z, -1.f);
+        vec3 fh = v3_norm(v3(fwd.x, 0.f, fwd.z));
+        vec3 right = v3_norm(v3_cross(fh, v3(0.f, 1.f, 0.f)));
+        vec3 up = v3_cross(right, fh);
+        basis3 flat = { right, up, v3_scale(fh, -1.f) };
+        basis3 held;
+        held.x = v3_norm(v3_lerp(flat.x, attf.x, 0.1f));
+        held.y = v3_norm(v3_lerp(flat.y, attf.y, 0.1f));
+        held.z = v3_norm(v3_cross(held.x, held.y));
+        held.y = v3_cross(held.z, held.x);
+        c->basis = basis_mul(held, look);
     } else {
         c->basis = basis_mul(attf, look);
     }

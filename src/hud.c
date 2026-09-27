@@ -207,7 +207,15 @@ static void flight_hud(const HudInfo *h, float s, float alpha) {
     float g[4] = { 0.45f, 1.f, 0.55f, 0.92f * alpha };
     float gd[4] = { 0.45f, 1.f, 0.55f, 0.5f * alpha };
     float amber[4] = { 1.f, 0.72f, 0.2f, 0.95f * alpha };
-    float lw = fmaxf(1.f, s * 0.5f);
+    /* On a panel in the world the ladder is read from a couple of metres off
+     * and against a bright sky: hairlines at half transparency disappear, so
+     * its strokes are three times as heavy and nearly opaque. */
+    float lw = fmaxf(1.f, s * (h->panel ? 1.6f : 0.5f));
+    if (h->panel) {
+        g[3] = 1.f * alpha;
+        gd[3] = 0.85f * alpha;
+        amber[3] = 1.f * alpha;
+    }
     int imp = h->units == UNITS_IMPERIAL;
     char buf[96];
 
@@ -394,6 +402,7 @@ static const char *const help_rows[][2] = {
     { "H", "flight HUD on / off" },
     { "PRINT SCREEN", "screenshot to Pictures\\Mriya" },
     { "F1", "this help" },
+    { "F2", "settings: quality, real weather, time of day" },
     { "ESC", "exit" },
 };
 static const char *const help_joy[][2] = {
@@ -492,10 +501,31 @@ void hud_ui_flush(void) {
     g_n = 0;
 }
 
+static void hud_build(const HudInfo *h);
+
+void hud_draw_panel(const HudInfo *h) {
+    glViewport(0, 0, h->width, h->height);
+    glClearColor(0.f, 0.f, 0.f, 0.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    hud_build(h);
+    if (g_n == 0) return;
+    g_ui_w = h->width; g_ui_h = h->height;
+    hud_ui_flush();
+}
+
 void hud_draw(const HudInfo *h) {
     if (h->fade >= 0.99f) return;
+    hud_build(h);
+    if (g_n == 0) return;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, h->width, h->height);
+    g_ui_w = h->width; g_ui_h = h->height;
+    hud_ui_flush();
+}
+
+static void hud_build(const HudInfo *h) {
     g_n = 0;
-    g_scale = fmaxf(1.f, floorf((float)h->height / 400.f + 0.5f));
+    g_scale = fmaxf(1.f, floorf((float)h->height / (h->panel ? 360.f : 400.f) + 0.5f));
     float s = g_scale;
     float vis = 1.f - h->fade;
     if (h->show_flight) flight_hud(h, s, vis * (1.f - h->passage * 0.8f));
@@ -509,21 +539,4 @@ void hud_draw(const HudInfo *h) {
         text((float)h->width * 0.5f, y - 22.f * s, h->caption, s * 2.f, 0, wc, 1);
         if (h->subcaption) text((float)h->width * 0.5f, y, h->subcaption, s * 1.f, 0, wd, 1);
     }
-    if (g_n == 0) return;
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, h->width, h->height);
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glUseProgram(g_prog);
-    glUniform2f(glGetUniformLocation(g_prog, "uRes"), (float)h->width, (float)h->height);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, g_font);
-    glUniform1i(glGetUniformLocation(g_prog, "uFont"), 0);
-    glBindVertexArray(g_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
-    glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(sizeof(HVert) * (size_t)g_n), g_v, GL_STREAM_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, g_n);
-    glBindVertexArray(0);
-    glDisable(GL_BLEND);
 }

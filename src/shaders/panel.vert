@@ -1,8 +1,9 @@
 // A panel hanging in the world: the menu, and the pointer's ray and dot.
 // The quad's corners come from the instance, so one draw call does the lot.
-layout(location = 0) in vec4 aA;    // xyz corner 0 (camera-relative), w unused
+layout(location = 0) in vec4 aA;    // xyz the centre (camera-relative), w what it is:
+                                    // 0 the first page, 1 the second, 2 a pointer's ray
 layout(location = 1) in vec4 aU;    // xyz the panel's width axis, times its width
-layout(location = 2) in vec4 aV;    // xyz its height axis, times its height; w = kind
+layout(location = 2) in vec4 aV;    // xyz its height axis, times its height
 
 uniform mat4 uViewProj;
 out vec2 vUV;
@@ -15,5 +16,5 @@ void main() {
     /* the page is drawn with y running down, into a texture whose origin is
      * at the bottom: the two cancel, so no flip belongs here */
     vUV = c;
-    vKind = aV.w;
+    vKind = aA.w;
 }

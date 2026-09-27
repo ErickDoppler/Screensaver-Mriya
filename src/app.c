@@ -53,6 +53,14 @@ typedef struct App {
     int         vr;             /* a headset has the picture */
     VrMenu      menu;           /* the panel in the headset */
     int         lens;           /* which lens the menu last chose */
+    float       vr_zoom;        /* the virtual camera's magnification, 1 = as the headset sees */
+    int         own_daylight;   /* the sun and moon are ours to place, not the scenario's */
+    int         wx_minutes_was; /* the scenery rotation, while live weather has it stopped */
+    int         place_lookup;   /* a city is being looked up */
+    float       in_cloud;       /* how much of the aircraft is in the weather */
+    float       place_t;        /* live weather: time until new ground */
+    int         place_minutes;
+    unsigned    hud_tex, hud_fbo;   /* the HUD as a panel, for the headset */
     int         menu_ray_on[VR_HANDS], menu_held[VR_HANDS];
     vec3        menu_ray_from[VR_HANDS], menu_ray_to[VR_HANDS];
     vec3        vr_shift;       /* the camera, moved by hand: camera frame, metres */
@@ -184,8 +192,37 @@ static void toggle_autopilot(App *a) {
         caption(a, "Autopilot on", a->joy ? "levelling off - Button 2 or Ctrl+A to fly again" : "back on the racetrack");
 }
 
+static void menu_apply(App *a, int what, int value);
+
+/* The settings panel on a monitor: F2 puts it up and takes it down. While it
+ * is up the mouse works it, so the screensaver must not take a movement or a
+ * click as a reason to leave, and the pointer has to be visible and free. */
+static void desktop_menu(App *a, int open) {
+    a->menu.on_screen = 1;
+    vrmenu_open(&a->menu, open);
+    if (open) {
+        if (a->s.mouse_rotation) SDL_SetWindowRelativeMouseMode(a->win, false);
+        SDL_ShowCursor();
+        /* in the middle of the panel, so the first movement is a small one */
+        float dens = SDL_GetWindowPixelDensity(a->win);
+        if (dens <= 0.f) dens = 1.f;
+        SDL_WarpMouseInWindow(a->win, a->width * 0.5f / dens, a->height * 0.5f / dens);
+    } else {
+        SDL_HideCursor();
+        if (a->s.mouse_rotation && a->cfg->mode == MODE_FULLSCREEN)
+            SDL_SetWindowRelativeMouseMode(a->win, true);
+    }
+}
+
 static void handle_key(App *a, const SDL_KeyboardEvent *k) {
     if (k->repeat) return;
+    /* F2: the settings panel, the same one the headset has */
+    if (k->key == SDLK_F2 && !a->vr) { desktop_menu(a, !a->menu.open); return; }
+    /* With the panel up, Escape closes it rather than the screensaver, and no
+     * other key is a reason to leave either. */
+    if (a->menu.open && !a->vr) {
+        if (k->key == SDLK_ESCAPE) { desktop_menu(a, 0); return; }
+    }
     /* In a headset the screensaver is not something to dismiss by brushing a
      * key: the runtime owns the display, and Alt+F4 (which arrives as a quit)
      * is the way out. */
@@ -208,7 +245,11 @@ static void handle_key(App *a, const SDL_KeyboardEvent *k) {
     /* Print Screen: our own capture of the frame on screen (the system's
      * grab of an OpenGL window can come back stale) */
     if (k->key == SDLK_PRINTSCREEN) { a->shot = 1; return; }
-    if (a->cfg->mode == MODE_FULLSCREEN && a->s.exit_on_any_key && !a->vr) { request_exit(a); return; }
+    /* with the settings panel up, a key is somebody using the panel */
+    if (a->cfg->mode == MODE_FULLSCREEN && a->s.exit_on_any_key && !a->vr && !a->menu.open) {
+        request_exit(a);
+        return;
+    }
 
     int cam = camera_for_key(k->key);
     if (cam >= 0 && cam < CAM_COUNT) {
@@ -248,7 +289,38 @@ static void handle_key(App *a, const SDL_KeyboardEvent *k) {
     }
 }
 
+/* The mouse on the settings panel: which row it is over, or a slider being
+ * dragged. The panel is drawn in the window's own pixels, so the pointer's
+ * position is all it takes. */
+static void desktop_menu_mouse(App *a, float mx, float my, int click, int held) {
+    float u, v;
+    /* the mouse comes in window coordinates, the panel is drawn in pixels */
+    float dens = SDL_GetWindowPixelDensity(a->win);
+    if (dens > 0.f) { mx *= dens; my *= dens; }
+    if (!vrmenu_screen_uv(&a->menu, a->width, a->height, mx, my, &u, &v)) {
+        if (!held) a->menu.hover = -1;
+        return;
+    }
+    int value = 0, what = VRMENU_NONE;
+    Settings shown = a->s;
+    if (shown.quality == 0) shown.quality = a->quality;
+    if (click)
+        what = vrmenu_click(&a->menu, &shown, a->flight_hud, a->cam.kind, a->ws.kind,
+                            a->lens, u, v, &value);
+    else if (held)
+        what = vrmenu_drag(&a->menu, u, v, &value);
+    else
+        vrmenu_hover(&a->menu, &shown, a->flight_hud, a->cam.kind, a->ws.kind, a->lens,
+                     u, v, &value);
+    menu_apply(a, what, value);
+    if (what != VRMENU_NONE) mark_input(a);
+}
+
 static void handle_mouse_motion(App *a, const SDL_MouseMotionEvent *m) {
+    if (a->menu.open && !a->vr) {
+        desktop_menu_mouse(a, m->x, m->y, 0, (m->state & SDL_BUTTON_LMASK) != 0);
+        return;
+    }
     if (a->elapsed < 0.5f) return;       /* the jump when relative mode turns on */
     if (a->s.mouse_rotation) {
         camera_look(&a->cam, m->xrel * 0.0022f, -m->yrel * 0.0022f);
@@ -262,7 +334,15 @@ static void handle_mouse_motion(App *a, const SDL_MouseMotionEvent *m) {
     if (a->mouse_travel > threshold) request_exit(a);
 }
 
-static void handle_mouse_button(App *a) {
+static void handle_mouse_button(App *a, const SDL_MouseButtonEvent *b) {
+    if (a->menu.open && !a->vr) {
+        /* the panel takes the click: pressing works a row, letting go ends a
+         * slider's drag */
+        if (b->down) desktop_menu_mouse(a, b->x, b->y, 1, 1);
+        else vrmenu_release(&a->menu);
+        return;
+    }
+    if (!b->down) return;
     if (a->cfg->mode != MODE_FULLSCREEN || a->vr) return;
     if (a->s.mouse_rotation || a->s.exit_on_mouse_move) request_exit(a);
 }
@@ -286,9 +366,15 @@ static void poll_events(App *a) {
             if (!passive(a)) handle_mouse_motion(a, &e.motion);
             break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            if (!passive(a)) handle_mouse_button(a);
+        case SDL_EVENT_MOUSE_BUTTON_UP:
+            if (!passive(a)) handle_mouse_button(a, &e.button);
             break;
         case SDL_EVENT_MOUSE_WHEEL:
+            /* with the panel up the wheel runs down the list instead */
+            if (a->menu.open && !a->vr) {
+                a->menu.scroll -= (int)e.wheel.y;
+                break;
+            }
             /* the wheel zooms (the globe camera: moves in and out) */
             if (!passive(a) && a->s.mouse_rotation) {
                 float steps = e.wheel.y * (e.wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -1.f : 1.f);
@@ -465,8 +551,13 @@ static void adapt_quality(App *a, float dt, float budget_ms) {
      * keep the GPU busy for a third to a half of each frame, not all of it -
      * the difference is a quiet fan and a cool card for a picture that is
      * hard to tell apart. */
-    if (a->frame_ms > budget_ms * 0.55f)      a->quality -= 6;
-    else if (a->frame_ms < budget_ms * 0.3f)  a->quality += 3;
+    /* A screensaver on a monitor keeps the GPU cool - a third to a half of
+     * each frame. A headset is another matter: the runtime paces the frames
+     * and a missed one is felt, but leaving two thirds of the budget unused
+     * only makes the picture worse than it need be. */
+    float lo = a->vr ? 0.55f : 0.3f, hi = a->vr ? 0.82f : 0.55f;
+    if (a->frame_ms > budget_ms * hi)        a->quality -= 6;
+    else if (a->frame_ms < budget_ms * lo)   a->quality += 3;
     a->quality = (int)clampf((float)a->quality, 5.f, 100.f);
     a->quality_hold = 2.f;
     if (a->quality == before) {
@@ -480,8 +571,93 @@ static void adapt_quality(App *a, float dt, float budget_ms) {
     }
     a->quality_saved = 0;
     a->r.q = render_quality(a->quality);
-    render_resize(&a->r, a->width, a->height);
+    /* the size the renderer already has: in a headset that is the eye's, not
+     * the window's, and handing it the window's tore the targets down and
+     * built them again every time the quality moved */
+    render_resize(&a->r, a->r.width, a->r.height);
     plat_log("quality -> %d (%.1f ms/frame, budget %.1f)", a->quality, a->frame_ms, budget_ms);
+}
+
+/* The moment the sky is lit by: now, or today at the hour the user set. */
+static time_t sky_time(const App *a) {
+    if (a->s.rt_daylight) return time(NULL);
+    time_t now = time(NULL);
+    struct tm t = *localtime(&now);
+    t.tm_hour = a->s.time_of_day / 60;
+    t.tm_min = a->s.time_of_day % 60;
+    t.tm_sec = 0;
+    return mktime(&t);
+}
+
+/* Where the sun and the moon are put, and by what. Live daylight follows the
+ * clock over the place; otherwise the hour is the user's own. Without a place
+ * of its own it uses a middling northern one, so the hour still means
+ * something. */
+static void apply_daylight(App *a) {
+    /* Ours whenever the hour is set by hand, or a place gives us a real one. */
+    a->own_daylight = !a->s.rt_daylight || (a->s.rt_lat || a->s.rt_lon);
+    if (!a->own_daylight) return;
+    double lat = a->s.rt_lat / 1e4, lon = a->s.rt_lon / 1e4;
+    if (!a->s.rt_lat && !a->s.rt_lon) { lat = 50.0; lon = 10.0; }
+    Weather *c = &a->ws.cur;
+    realtime_sky(lat, lon, sky_time(a), &c->sun_elev, &c->sun_azim,
+                 &c->moon_elev, &c->moon_azim, &c->moon_phase);
+}
+
+/* Live weather needs a place and a thread fetching it; without it the
+ * scenery rotates as it always has. */
+/* In a headset there is no dialog to press Find in: if a city was typed but
+ * never looked up, look it up ourselves and carry on when it answers. */
+static void want_place(App *a) {
+    if (a->s.rt_lat || a->s.rt_lon || a->place_lookup) return;
+    if (!a->rt_place[0]) return;
+    a->place_lookup = 1;
+    realtime_geocode_async(a->rt_place);
+    plat_log("real time: looking up %s", a->rt_place);
+}
+
+static void apply_weather_source(App *a) {
+    /* A place is what it needs. The dialog's own tick-box only says whether
+     * the place is used at all, and asking for the live weather in the menu
+     * says as much. */
+    if ((a->s.rt_weather || !a->s.rt_daylight) && (a->s.rt_lat || a->s.rt_lon)) a->s.real_time = 1;
+    int want = a->s.rt_weather && (a->s.rt_lat || a->s.rt_lon);
+    if (want == a->real) return;
+    if (want) {
+        a->real = 1;
+        a->rt_first = 1;
+        a->place_minutes = 5;
+        a->wx_minutes_was = a->s.weather_minutes;
+        a->s.weather_minutes = 0;          /* the sky is the place's own now */
+        realtime_start(a->s.rt_lat / 1e4, a->s.rt_lon / 1e4);
+        plat_log("real time: live weather for %s", a->rt_place);
+    } else {
+        a->real = 0;
+        realtime_stop();
+        if (a->wx_minutes_was > 0) a->s.weather_minutes = a->wx_minutes_was;
+        plat_log("real time: the scenery's own weather again");
+    }
+}
+
+/* How deep in cloud the aircraft is, 0 to 1: inside a layer that has any
+ * cover, with a little softness at its edges so nothing switches on a metre.
+ * Below the base it counts as in the weather too - that is where the rain is.
+ */
+static float cloud_immersion(const Weather *w, double alt_m) {
+    float alt = (float)alt_m, best = 0.f;
+    const CloudLayer *ls[2] = { &w->low, &w->mid };
+    for (int i = 0; i < 2; ++i) {
+        const CloudLayer *l = ls[i];
+        if (l->cover < 0.12f) continue;
+        float inside = smoothstepf(l->base - 120.f, l->base + 120.f, alt) *
+                       (1.f - smoothstepf(l->top - 120.f, l->top + 120.f, alt));
+        best = fmaxf(best, inside * clampf(l->cover * 1.6f, 0.f, 1.f));
+    }
+    /* under the lowest cloud, in whatever is falling out of it */
+    if (w->low.cover > 0.12f && (w->rain > 0.f || w->snow > 0.f))
+        best = fmaxf(best, (1.f - smoothstepf(w->low.base - 200.f, w->low.base, alt)) *
+                           clampf(fmaxf(w->rain, w->snow) * 2.f, 0.f, 1.f));
+    return best;
 }
 
 /* One step of the world. */
@@ -493,9 +669,11 @@ static void simulate(App *a, float dt) {
     /* the wind strengthens with height, as it does */
     float ws = w->wind_speed * (float)clampd(0.35 + a->fl.pos.y / 9000.0, 0.35, 1.3);
     dvec3 wind = dv3(-sin(wd) * ws, 0.0, cos(wd) * ws);
-    float turb = w->turbulence;
-    /* flying inside a cloud is bumpy even on a calm day */
-    flight_update(&a->fl, &a->s, &a->ws.terrain, &a->in, sim_dt, turb, wind);
+    /* How much of the aircraft is in cloud: rough air, wings working, rain on
+     * the glass. Above the deck in the same storm there is none of it. */
+    a->in_cloud = cloud_immersion(&a->ws.cur, a->fl.pos.y);
+    flight_update(&a->fl, &a->s, &a->ws.terrain, &a->in, sim_dt,
+                  w->turbulence, a->in_cloud, wind);
     /* Real time: live conditions change the weather gradually as they
      * arrive, the first ones a little faster. */
     if (a->real) {
@@ -513,15 +691,41 @@ static void simulate(App *a, float dt) {
         flight_set_autopilot(&a->fl, 1);
         caption(a, "Autopilot on", "terrain - Button 2 or Ctrl+A to fly again");
     }
+    if (a->real) {
+        /* the scenery's own clock, borrowed: it moves the aircraft to new
+         * ground rather than bringing new weather */
+        a->place_t += dt;
+        if (a->place_minutes > 0 && a->place_t > a->place_minutes * 60.f) {
+            a->place_t = 0.f;
+            weather_next_place(&a->ws);
+        }
+    }
     int wx = weather_update(&a->ws, &a->s, dt, a->fl.pos);
     if (wx & 1) aim_for_weather(a);
     if (wx & 2) place_for_weather(a, 0);
-    /* and the sun and the moon where they really are, now */
-    if (a->real) {
-        Weather *c = &a->ws.cur;
-        realtime_sky(a->s.rt_lat / 1e4, a->s.rt_lon / 1e4, time(NULL),
-                     &c->sun_elev, &c->sun_azim, &c->moon_elev, &c->moon_azim, &c->moon_phase);
+    if (a->place_lookup) {
+        char name[128];
+        double lat = 0.0, lon = 0.0;
+        int r = realtime_geocode_poll(name, sizeof name, &lat, &lon);
+        if (r) {
+            a->place_lookup = 0;
+            if (r > 0) {
+                a->s.rt_lat = (int)lround(lat * 1e4);
+                a->s.rt_lon = (int)lround(lon * 1e4);
+                snprintf(a->rt_place, sizeof a->rt_place, "%s", name);
+                plat_store_write_int("rt-lat", a->s.rt_lat);
+                plat_store_write_int("rt-lon", a->s.rt_lon);
+                plat_store_write_str("rt-place", a->rt_place);
+                apply_weather_source(a);
+                apply_daylight(a);
+                caption(a, a->rt_place, "real time - the weather is on its way");
+            }
+        }
     }
+
+    /* The sun and the moon, kept where the clock in charge puts them: a
+     * change of scenery would otherwise bring back the scenario's own. */
+    if (a->own_daylight) apply_daylight(a);
     /* The cameras rotate on their own only when nobody is there: not while
      * the pilot is flying the aircraft, not for ten minutes after the user
      * picked a camera, and not until nothing has been touched for a minute.
@@ -576,6 +780,60 @@ static void simulate(App *a, float dt) {
 static void draw_view(App *a, float dt, int eye);
 static void draw(App *a, float dt) { draw_view(a, dt, -1); }
 
+/* What a menu row asks for, carried out. The same for a controller in a
+ * headset and the mouse on a monitor, so the menu behaves the same in both. */
+static void menu_apply(App *a, int what, int value) {
+    switch (what) {
+    case VRMENU_TOGGLE_HUD:
+        /* what anyone means by the HUD: the instruments, not the scenery
+         * captions */
+        a->flight_hud = !a->flight_hud;
+        break;
+    case VRMENU_CAMERA:
+        a->cam.pending = value; a->cam_picked = a->elapsed; break;
+    case VRMENU_SCENE:
+        weather_change_to(&a->ws, value, 1); break;
+    case VRMENU_QUALITY:
+        /* Setting it by hand takes it off automatic, and it has to be handed
+         * to the renderer there and then: nothing else does it once the
+         * automatic quality has stopped adjusting. */
+        a->s.quality = value;
+        a->auto_quality = (value == 0);
+        if (value > 0) {
+            a->quality = value;
+            a->r.q = render_quality(a->quality);
+            render_resize(&a->r, a->r.width, a->r.height);
+            plat_log("menu: quality %d -> scene %dx%d, clouds %dx%d, %d steps",
+                     a->quality, a->r.w, a->r.h, a->r.cw, a->r.ch, a->r.q.cloud_steps);
+        }
+        break;
+    case VRMENU_AUTOPILOT:
+        a->s.autopilot_resume = value; break;
+    case VRMENU_RT_DAYLIGHT:
+        a->s.rt_daylight = !a->s.rt_daylight;
+        if (a->s.rt_daylight) want_place(a);
+        apply_weather_source(a);
+        apply_daylight(a);
+        break;
+    case VRMENU_RT_WEATHER:
+        a->s.rt_weather = !a->s.rt_weather;
+        if (a->s.rt_weather) want_place(a);
+        apply_weather_source(a);
+        break;
+    case VRMENU_TIME_OF_DAY:
+        a->s.time_of_day = value;
+        apply_daylight(a);
+        break;
+    case VRMENU_LENS:
+        a->lens = value;
+        a->vr_zoom = vrmenu_lens_zoom(value);
+        break;
+    case VRMENU_EXIT:
+        request_exit(a); break;
+    default: break;
+    }
+}
+
 /* What the controllers do:
  *
  *   stick                     turn the view (left/right) and zoom (up/down)
@@ -588,6 +846,15 @@ static void draw(App *a, float dt) { draw_view(a, dt, -1); }
  *   A / X                     the next camera
  *   B / Y                     the menu
  */
+/* One stick axis, with its dead zone taken out and the rest stretched back
+ * over the full range. */
+static float stick_axis(float v) {
+    const float dead = 0.25f;
+    if (v > dead) return (v - dead) / (1.f - dead);
+    if (v < -dead) return (v + dead) / (1.f - dead);
+    return 0.f;
+}
+
 static void vr_controls(App *a, float dt) {
     const VrInput *in = vr_input();
     int any = 0;
@@ -607,6 +874,8 @@ static void vr_controls(App *a, float dt) {
             a->vr_shift = v3(0.f, 0.f, 0.f);
             a->cam.look_yaw = a->cam.look_pitch = 0.f;
             a->cam.zoom = 1.f;
+            a->vr_zoom = 1.f;
+            a->lens = LENS_NORMAL;
             a->vr_grab[h] = 0;
             any = 1;
             continue;
@@ -640,10 +909,18 @@ static void vr_controls(App *a, float dt) {
 
         /* The stick turns the view and zooms - except while the middle
          * finger holds the view, when left and right step the scenery. */
-        float sy = in->stick_y[h], sx = in->stick_x[h];
-        if (fabsf(sy) > 0.15f) { camera_wheel(&a->cam, sy * dt * 6.f); any = 1; }
+        /* A stick at rest is never quite at zero. Past the dead zone the
+         * push is measured from its edge, so nothing creeps and nothing
+         * jumps when it takes hold. */
+        float sy = stick_axis(in->stick_y[h]), sx = stick_axis(in->stick_x[h]);
+        if (sy != 0.f) {
+            /* magnification, geometrically: a steady push doubles it in about
+             * a second and a half, whatever it is at */
+            a->vr_zoom = clampf(a->vr_zoom * expf(sy * dt * 0.9f), 0.55f, 4.f);
+            any = 1;
+        }
         if (turn) {
-            if (fabsf(sx) > 0.7f && a->vr_stick_dead[h] <= 0.f) {
+            if (fabsf(sx) > 0.6f && a->vr_stick_dead[h] <= 0.f) {
                 int kind = a->ws.kind + (sx > 0.f ? 1 : -1);
                 if (kind < 0) kind = WX_COUNT - 1;
                 if (kind >= WX_COUNT) kind = 0;
@@ -651,10 +928,10 @@ static void vr_controls(App *a, float dt) {
                 a->vr_stick_dead[h] = 0.6f;
                 any = 1;
             }
-            if (fabsf(sx) < 0.3f) a->vr_stick_dead[h] = 0.f;
+            if (fabsf(sx) < 0.25f) a->vr_stick_dead[h] = 0.f;
             else a->vr_stick_dead[h] -= dt;
-        } else if (fabsf(sx) > 0.15f) {
-            a->cam.look_yaw = wrapf(a->cam.look_yaw - sx * dt * 1.6f, -MR_PI, MR_PI);
+        } else if (sx != 0.f) {
+            a->cam.look_yaw = wrapf(a->cam.look_yaw + sx * dt * 1.6f, -MR_PI, MR_PI);
             a->cam.look_idle = 0.f;
             any = 1;
         }
@@ -663,25 +940,27 @@ static void vr_controls(App *a, float dt) {
         if (in->lower_edge[h]) { camera_next(&a->cam, &a->s); a->cam_picked = a->elapsed; any = 1; }
         if (in->upper_edge[h]) {
             vrmenu_open(&a->menu, !a->menu.open);
-            if (a->menu.open) {
-                /* It hangs where it was put: a metre and a half in front of
-                 * the head as it was, upright however the head was tilted,
-                 * and it stays there while you look about. */
-                const VrView *hv = vr_view(0);
-                if (hv) {
-                    vec3 fwd = v3_scale(hv->basis.z, -1.f);
-                    vec3 flat = v3(fwd.x, 0.f, fwd.z);
-                    if (v3_len(flat) < 0.1f) flat = v3(0.f, 0.f, -1.f);
-                    flat = v3_norm(flat);
-                    a->menu.pos = v3_add(hv->pos, v3_scale(flat, 1.5f));
-                    vec3 up = v3(0.f, 1.f, 0.f);
-                    vec3 right = v3_norm(v3_cross(flat, up));
-                    a->menu.basis = (basis3){ right, up, v3_scale(flat, -1.f) };
-                }
-            }
+            plat_log("vr: menu %s", a->menu.open ? "open" : "closed");
             any = 1;
         }
     }
+    /* Hang it in front of the head: a metre and a half ahead, upright
+     * however the head is tilted. Then it stays put while you look about. */
+    if (a->menu.open && a->menu.place_pending) {
+        const VrView *hv = vr_view(0);
+        if (hv && vr_should_render()) {
+            vec3 fwd = v3_scale(hv->basis.z, -1.f);
+            vec3 flat = v3(fwd.x, 0.f, fwd.z);
+            if (v3_len(flat) < 0.1f) flat = v3(0.f, 0.f, -1.f);
+            flat = v3_norm(flat);
+            a->menu.pos = v3_add(hv->pos, v3_scale(flat, 1.5f));
+            vec3 up = v3(0.f, 1.f, 0.f);
+            vec3 right = v3_norm(v3_cross(flat, up));
+            a->menu.basis = (basis3){ right, up, v3_scale(flat, -1.f) };
+            a->menu.place_pending = 0;
+        }
+    }
+
     /* The pointer: while the menu is up, the trigger works it rather than
      * moving the camera. */
     if (a->menu.open) {
@@ -699,7 +978,7 @@ static void vr_controls(App *a, float dt) {
             int value = 0, what = VRMENU_NONE;
             if (in->trigger[h] > 0.6f && !a->menu_held[h]) {
                 a->menu_held[h] = 1;
-                what = vrmenu_click(&a->menu, &a->s, a->s.hud > HUD_OFF, a->cam.kind, a->ws.kind,
+                what = vrmenu_click(&a->menu, &a->s, a->flight_hud, a->cam.kind, a->ws.kind,
                                     a->lens, u, v, &value);
             } else if (in->trigger[h] > 0.6f) {
                 what = vrmenu_drag(&a->menu, u, v, &value);
@@ -709,36 +988,78 @@ static void vr_controls(App *a, float dt) {
                 /* just pointing: light up what is under it */
                 int dummy = 0;
                 a->menu.hover = -1;
-                vrmenu_hover(&a->menu, &a->s, a->s.hud > HUD_OFF, a->cam.kind, a->ws.kind, a->lens,
+                vrmenu_hover(&a->menu, &a->s, a->flight_hud, a->cam.kind, a->ws.kind, a->lens,
                              u, v, &dummy);
             }
-            switch (what) {
-            case VRMENU_TOGGLE_HUD:
-                a->s.hud = a->s.hud > HUD_OFF ? HUD_OFF : HUD_CAPTIONS;
-                a->flight_hud = a->s.hud == HUD_FULL;
-                break;
-            case VRMENU_CAMERA:
-                a->cam.pending = value; a->cam_picked = a->elapsed; break;
-            case VRMENU_SCENE:
-                weather_change_to(&a->ws, value, 1); break;
-            case VRMENU_QUALITY:
-                a->s.quality = value; a->quality = value > 0 ? value : a->quality;
-                a->auto_quality = value == 0; break;
-            case VRMENU_AUTOPILOT:
-                a->s.autopilot_resume = value; break;
-            case VRMENU_LENS:
-                a->lens = value; a->cam.zoom = vrmenu_lens_zoom(value); break;
-            case VRMENU_EXIT:
-                request_exit(a); break;
-            default: break;
-            }
+            menu_apply(a, what, value);
             if (what != VRMENU_NONE) any = 1;
         }
-        vrmenu_paint(&a->menu, &a->s, a->s.hud > HUD_OFF, a->cam.kind, a->ws.kind, a->lens);
+        {   /* the menu shows what is in force, which with automatic quality
+             * is not what the setting says */
+            Settings shown = a->s;
+            if (shown.quality == 0) shown.quality = a->quality;
+            vrmenu_paint(&a->menu, &shown, a->flight_hud, a->cam.kind, a->ws.kind, a->lens);
+        }
     } else {
         for (int h = 0; h < VR_HANDS; ++h) { a->menu_ray_on[h] = 0; a->menu_held[h] = 0; }
     }
     if (any) mark_input(a);
+}
+
+/* In a headset the HUD cannot be painted over the eye - it has to be
+ * something in the world to look at. It is drawn into a texture and hung a
+ * couple of metres ahead of the camera, below the line of sight. */
+/* The glass: how big it is, how far ahead of the eye it hangs, and how many
+ * pixels are painted on it. The page's own scale then follows from its
+ * height, as it does on a monitor. */
+#define HUD_PANEL_W 1920
+#define HUD_PANEL_H 1080
+#define HUD_PANEL_M 3.0f       /* metres across */
+#define HUD_PANEL_D 2.4f       /* metres in front of the eye */
+static void vr_hud_panel(App *a, float dt) {
+    if (!a->hud_tex) {
+        glGenTextures(1, &a->hud_tex);
+        glBindTexture(GL_TEXTURE_2D, a->hud_tex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, HUD_PANEL_W, HUD_PANEL_H, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glGenFramebuffers(1, &a->hud_fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, a->hud_fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, a->hud_tex, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+    HudInfo h;
+    memset(&h, 0, sizeof h);
+    h.fl = &a->fl;
+    h.width = HUD_PANEL_W;
+    h.height = HUD_PANEL_H;
+    h.show_flight = a->flight_hud;
+    h.units = a->s.units;
+    h.caption = a->caption[0] ? a->caption : NULL;
+    h.subcaption = a->subcaption[0] ? a->subcaption : NULL;
+    h.caption_alpha = clampf(a->caption_t / 1.2f, 0.f, 1.f) *
+                      clampf((CAPTION_TIME - a->caption_t) / 0.4f, 0.f, 1.f);
+    h.autopilot_resume = a->s.autopilot_resume;
+    h.show_help = 0;
+    h.panel = 1;
+    /* The ladder and the flight path marker are drawn by projecting world
+     * directions onto the page: the page stands for a window of the world,
+     * squared to the aircraft, subtending what the glass subtends from the
+     * eye. Without these the projection fails and the ladder is simply not
+     * there. */
+    h.cam_basis = dbasis_to_basis(flight_attitude(&a->fl));
+    {
+        float hm = HUD_PANEL_M * (float)HUD_PANEL_H / (float)HUD_PANEL_W;
+        h.fov = 2.f * atanf((hm * 0.5f) / HUD_PANEL_D);
+    }
+    h.joystick = a->joy != NULL;
+    h.passage = a->ws.passage;
+    (void)dt;
+    glBindFramebuffer(GL_FRAMEBUFFER, a->hud_fbo);
+    hud_draw_panel(&h);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 /* A headset frame: wait for the runtime's cadence, draw each eye into the
@@ -747,6 +1068,8 @@ static void vr_controls(App *a, float dt) {
 static void draw_vr(App *a, float dt) {
     if (!vr_begin_frame()) return;
     vr_controls(a, dt > 0.f ? dt : 1.f / 90.f);
+    int want_hud = a->s.hud > HUD_OFF || a->flight_hud;
+    if (want_hud) vr_hud_panel(a, dt);
     if (vr_should_render()) {
         const VrView *v0 = vr_view(0);
         if (v0 && (a->r.width != v0->w || a->r.height != v0->h)) render_resize(&a->r, v0->w, v0->h);
@@ -788,24 +1111,50 @@ static void draw_view(App *a, float dt, int eye) {
         f.cam_basis = basis_mul(a->cam.basis, v->basis);
         vec3 off = basis_apply(a->cam.basis, v3_add(v->pos, a->vr_shift));
         f.cam_pos = dv3_add(a->cam.pos, v3_to_dv3(off));
-        /* Zoom in a headset cannot widen the lens - the optics are fixed -
-         * so it magnifies instead: the eye's own frustum, narrowed about its
-         * axis, like raising binoculars. */
-        float z = clampf(a->cam.zoom, 0.25f, 1.6f);
-        f.tan_l = v->tan_l * z; f.tan_r = v->tan_r * z;
-        f.tan_d = v->tan_d * z; f.tan_u = v->tan_u * z;
+        /* Zoom is the virtual camera's own: the eye's frustum narrowed by
+         * the magnification and drawn across the whole of the eye's image.
+         * The layer still declares the runtime's own field of view, so the
+         * headset's optics and its distortion are untouched - what changes is
+         * how much of the world is spread over them. Each eye keeps its own
+         * asymmetric frustum, so the stereo stays right.
+         *
+         * Tangents, not angles: halving the tangent is what halves the width
+         * of the world on screen. */
+        float mag = clampf(a->vr_zoom, 0.55f, 4.f);
+        f.tan_l = v->tan_l / mag; f.tan_r = v->tan_r / mag;
+        f.tan_d = v->tan_d / mag; f.tan_u = v->tan_u / mag;
         f.target_fbo = a->vr_fbo;
         render_set_eye(&a->r, eye);
-        if (a->menu.open) {
+        /* the HUD's panel: fixed ahead of the camera, a little below the
+         * line of sight, so it reads like a display in front of you */
+        if ((a->s.hud > HUD_OFF || a->flight_hud) && a->hud_tex) {
+            /* A head-up display is glass in front of the pilot: it belongs to
+             * the aircraft, not to the head. Squared to the way the aircraft
+             * is flying, close in front of the eye, so the ladder reads
+             * against the real horizon and looking about moves past it
+             * instead of dragging it along. */
+            basis3 ab = dbasis_to_basis(flight_attitude(&a->fl));
+            vec3 fwd = v3_scale(ab.z, -1.f);
+            f.ui_tex = a->hud_tex;
+            f.ui_pos = v3_add(v3_scale(fwd, HUD_PANEL_D), v3_scale(ab.y, -0.06f));
+            f.ui_basis = ab;
+            f.ui_w = HUD_PANEL_M;
+            f.ui_h = HUD_PANEL_M * (float)HUD_PANEL_H / (float)HUD_PANEL_W;
+            f.ui_alpha = 1.f;
+        }
+        if (a->menu.open && !a->menu.place_pending) {
             /* The menu and the pointers live in the headset's own frame; the
              * renderer works in world axes about this eye. */
-            vec3 eye_at = v3_add(v->pos, a->vr_shift);
-            f.ui_tex = a->menu.tex;
-            f.ui_pos = basis_apply(a->cam.basis, v3_sub(a->menu.pos, eye_at));
-            f.ui_basis = basis_mul(a->cam.basis, a->menu.basis);
-            f.ui_w = a->menu.width_m;
-            f.ui_h = a->menu.height_m;
-            f.ui_alpha = 1.f;
+            /* Sliding the camera moves the whole room with it, so its shift
+             * cancels here: what matters is where these are relative to the
+             * eye itself. */
+            vec3 eye_at = v->pos;
+            f.ui2_tex = a->menu.tex;
+            f.ui2_pos = basis_apply(a->cam.basis, v3_sub(a->menu.pos, eye_at));
+            f.ui2_basis = basis_mul(a->cam.basis, a->menu.basis);
+            f.ui2_w = a->menu.width_m;
+            f.ui2_h = a->menu.height_m;
+            f.ui2_alpha = 1.f;
             for (int h = 0; h < 2; ++h) {
                 f.ray_on[h] = a->menu_ray_on[h];
                 f.ray_from[h] = basis_apply(a->cam.basis, v3_sub(a->menu_ray_from[h], eye_at));
@@ -840,11 +1189,9 @@ static void draw_view(App *a, float dt, int eye) {
     f.haze = 0.35f + 0.65f * (float)a->fl.throttle;
     f.trails = &a->trails;
     f.wind_off = dv3(a->ws.wind_offset_x, 0.0, a->ws.wind_offset_z);
+    f.in_cloud = a->in_cloud;
     render_frame(&a->r, &f);
 
-    /* The flat HUD is drawn in window pixels: in a headset it lands in the
-     * corner of the eye image as a floating slab. It waits for a panel of
-     * its own, in the world. */
     if ((a->s.hud > HUD_OFF || a->flight_hud || a->help) && !passive(a) && !a->vr) {
         HudInfo h;
         memset(&h, 0, sizeof h);
@@ -864,6 +1211,15 @@ static void draw_view(App *a, float dt, int eye) {
         h.show_help = a->help;
         h.joystick = a->joy != NULL;
         hud_draw(&h);
+    }
+    /* The settings panel, over everything, in the middle of the screen. It
+     * shows the quality that is in force, which with automatic quality is not
+     * what the setting says. */
+    if (a->menu.open && !a->vr && !passive(a)) {
+        Settings shown = a->s;
+        if (shown.quality == 0) shown.quality = a->quality;
+        vrmenu_paint_screen(&a->menu, &shown, a->flight_hud, a->cam.kind, a->ws.kind,
+                            a->lens, a->width, a->height);
     }
 }
 
@@ -918,16 +1274,22 @@ int app_run(const AppConfig *cfg) {
         if (v) render_resize(&a.r, v->w, v->h);
         /* two eyes at ninety frames a second: the picture has to give way.
          * Automatic quality then settles it against the headset's budget. */
-        a.quality = 25;
+        render_quality_for_vr(1);
+        a.quality = a.s.quality > 0 ? a.s.quality : 45;
         a.s.target_fps = 90;
+        a.r.q = render_quality(a.quality);
         camera_hold_gaze(&a.cam, 1);   /* the view stays where a hand puts it */
         a.lens = LENS_NORMAL;
-        if (!vrmenu_init(&a.menu)) plat_log("vr: the menu panel could not be made");
+        a.vr_zoom = 1.f;
         plat_log("start: VR, %dx%d per eye", v ? v->w : 0, v ? v->h : 0);
     }
     a.r.q = render_quality(a.quality);
     render_resize(&a.r, a.width, a.height);
     if (!hud_init()) { code = 4; goto done; }
+    /* The menu belongs to both: the headset hangs it in the world, and on a
+     * monitor F2 puts it up in the middle of the screen. */
+    if (!passive(&a) && !vrmenu_init(&a.menu))
+        plat_log("the menu panel could not be made");
     a.q_w = a.width;
     a.q_h = a.height;
     a.frame_ms = 1000.f / (float)a.s.target_fps;
@@ -953,21 +1315,22 @@ int app_run(const AppConfig *cfg) {
     a.last_cam = a.cam.kind;
     a.flight_hud = a.s.hud == HUD_FULL;
     a.help = cfg->show_keys;
+    if (cfg->show_menu && !a.vr && !passive(&a)) {
+        desktop_menu(&a, 1);
+        a.menu.page = cfg->show_menu - 1;
+    }
     a.cam_picked = -1e9f;
     a.nose_hint = a.cam.kind == CAM_NOSE;
     /* Real time needs a place; the automatic rotation stops, the weather is
      * the real one. Not in the little preview monitor. */
-    if (a.s.real_time && (a.s.rt_lat || a.s.rt_lon) && !passive(&a)) {
-        a.real = 1;
-        a.rt_first = 1;
+    if (!passive(&a)) {
         if (!plat_store_read_str("rt-place", a.rt_place, sizeof a.rt_place) || !a.rt_place[0])
             snprintf(a.rt_place, sizeof a.rt_place, "%.2f, %.2f", a.s.rt_lat / 1e4, a.s.rt_lon / 1e4);
-        a.s.weather_minutes = 0;
-        realtime_start(a.s.rt_lat / 1e4, a.s.rt_lon / 1e4);
-        Weather *c = &a.ws.cur;
-        realtime_sky(a.s.rt_lat / 1e4, a.s.rt_lon / 1e4, time(NULL),
-                     &c->sun_elev, &c->sun_azim, &c->moon_elev, &c->moon_azim, &c->moon_phase);
-        plat_log("real time: %s", a.rt_place);
+        if (a.s.rt_weather || a.s.rt_daylight) want_place(&a);
+        apply_weather_source(&a);
+        apply_daylight(&a);
+        plat_log("time: %s daylight%s, %s weather", a.s.rt_daylight ? "live" : "set by hand",
+                 a.own_daylight ? "" : " (the scenario's own)", a.real ? "live" : "the scenario's");
     }
     {
         char sub[128];
@@ -1025,11 +1388,13 @@ int app_run(const AppConfig *cfg) {
             plat_log("frame %d drawn (gpu %.1f ms, quality %d)", a.frames, a.r.last_frame_ms, a.quality);
         if (cfg->trace && a.frames % 15 == 0)
             plat_log("t=%6.1f pos=(%.0f, %.0f, %.0f) hdg=%5.1f v=%5.1f vs=%+5.1f pitch=%+5.1f bank=%+5.1f n=%.2f thr=%.2f "
-                     "ap=%d leg=%.0fkm tgt=%.0f floor=%.0f agl=%.0f wx=%s cam=%s q=%d gpu=%.1fms",
+                     "ap=%d leg=%.0fkm tgt=%.0f floor=%.0f agl=%.0f cloud=%.2f flex=%+.2f "
+                     "wx=%s cam=%s q=%d gpu=%.1fms",
                      a.elapsed, a.fl.pos.x, a.fl.pos.y, a.fl.pos.z,
                      wrapd(flight_heading(&a.fl) * 180.0 / MR_PI_D, 0.0, 360.0), a.fl.speed, a.fl.vs,
                      flight_pitch(&a.fl) * 180.0 / MR_PI_D, a.fl.bank * 180.0 / MR_PI_D, a.fl.n, a.fl.throttle, !a.fl.manual,
                      a.fl.leg_flown / 1000.0, a.fl.alt_target, a.fl.floor_alt, a.fl.pos.y - a.fl.ground,
+                     a.in_cloud, a.fl.flex,
                      settings_scene_name(a.ws.kind), settings_camera_name(a.cam.kind), a.quality,
                      a.r.last_frame_ms);
         if (cfg->dump_path && cfg->frame_limit > 0 && a.frames >= cfg->frame_limit) {
@@ -1059,7 +1424,12 @@ int app_run(const AppConfig *cfg) {
         next_deadline += frame_ns;
         if (next_deadline < now) next_deadline = now + frame_ns;
     }
-    if (a.vr) { vrmenu_shutdown(&a.menu); vr_shutdown(); a.vr = 0; }
+    if (a.vr) {
+        if (a.hud_tex) glDeleteTextures(1, &a.hud_tex);
+        if (a.hud_fbo) glDeleteFramebuffers(1, &a.hud_fbo);
+        vr_shutdown();
+        a.vr = 0;
+    }
     plat_log("stop: %d frames in %.2f s (%.1f fps avg), quality=%d, %.1f ms/frame",
              a.frames, a.elapsed, a.elapsed > 0.f ? a.frames / a.elapsed : 0.f, a.quality, a.frame_ms);
 done:
@@ -1078,6 +1448,7 @@ done:
     }
     realtime_stop();
     if (a.joy) SDL_CloseJoystick(a.joy);
+    vrmenu_shutdown(&a.menu);
     hud_shutdown();
     render_shutdown(&a.r);
     if (a.gl) SDL_GL_DestroyContext(a.gl);

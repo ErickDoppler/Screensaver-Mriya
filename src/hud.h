@@ -20,11 +20,15 @@ typedef struct HudInfo {
     float passage;
     int   autopilot_resume;     /* seconds, for the countdown */
     int   show_help;            /* F1: every key, in a panel */
+    int   panel;                /* drawn onto a panel in the world, not the screen */
     int   joystick;             /* a joystick is plugged in */
 } HudInfo;
 
 int  hud_init(void);
 void hud_draw(const HudInfo *h);
+/* The same HUD, into the framebuffer that is bound, at h->width x h->height,
+ * and on a transparent ground: the headset hangs it on a panel in the world. */
+void hud_draw_panel(const HudInfo *h);
 void hud_shutdown(void);
 
 /* The same text and shapes, for anything else that needs them - the menu in

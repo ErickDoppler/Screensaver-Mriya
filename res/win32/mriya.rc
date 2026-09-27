@@ -14,7 +14,7 @@ END
 // group's edge. The scenario and camera pickers at the bottom are created
 // hidden and revealed by Ctrl+Alt+S, which also grows the dialog by
 // SCENES_EXTRA_DU and pushes the buttons down - keep the two in step.
-IDD_CONFIG DIALOGEX 0, 0, 480, 329
+IDD_CONFIG DIALOGEX 0, 0, 480, 347
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Mriya - Settings"
 FONT 8, "MS Shell Dlg", 400, 0, 1
@@ -82,77 +82,82 @@ BEGIN
     RTEXT           "", IDC_FPS_VAL, 438, 186, 32, 8
 
     // ---------------------------------------------------------- real time
-    GROUPBOX        "Real time", IDC_STATIC, 7, 224, 465, 40
-    AUTOCHECKBOX    "Fly in the daylight and the live weather of", IDC_RT, 14, 238, 158, 10
-    EDITTEXT        IDC_RT_CITY, 174, 236, 170, 13, ES_AUTOHSCROLL
-    PUSHBUTTON      "Find", IDC_RT_FIND, 348, 235, 44, 14
-    LTEXT           "", IDC_RT_PLACE, 14, 251, 454, 8
+    GROUPBOX        "Real time", IDC_STATIC, 7, 224, 465, 58
+    AUTOCHECKBOX    "Fly over", IDC_RT, 14, 238, 50, 10
+    EDITTEXT        IDC_RT_CITY, 68, 236, 180, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "Find", IDC_RT_FIND, 252, 235, 44, 14
+    AUTOCHECKBOX    "Its daylight", IDC_RT_DAYLIGHT, 306, 238, 62, 10
+    AUTOCHECKBOX    "Its weather", IDC_RT_WEATHER, 376, 238, 66, 10
+    LTEXT           "", IDC_RT_PLACE, 14, 252, 454, 8
+    LTEXT           "Time of day", IDC_TOD_LABEL, 14, 267, 50, 8
+    CONTROL         "", IDC_TOD, "msctls_trackbar32", TBS_HORZ | WS_TABSTOP, 68, 264, 228, 15
+    RTEXT           "", IDC_TOD_VAL, 300, 267, 40, 8
 
     // ----------------------------------------------------------- joystick
-    GROUPBOX        "Joystick", IDC_STATIC, 7, 268, 465, 30
-    LTEXT           "", IDC_JOY_NAME, 14, 282, 176, 8
-    AUTOCHECKBOX    "Invert roll", IDC_JOY_INV_ROLL, 194, 281, 62, 10
-    AUTOCHECKBOX    "Invert pitch", IDC_JOY_INV_PITCH, 258, 281, 62, 10
-    AUTOCHECKBOX    "Invert throttle", IDC_JOY_INV_THR, 322, 281, 70, 10
-    AUTOCHECKBOX    "Invert rudder", IDC_JOY_INV_RUD, 396, 281, 70, 10
+    GROUPBOX        "Joystick", IDC_STATIC, 7, 286, 465, 30
+    LTEXT           "", IDC_JOY_NAME, 14, 300, 176, 8
+    AUTOCHECKBOX    "Invert roll", IDC_JOY_INV_ROLL, 194, 299, 62, 10
+    AUTOCHECKBOX    "Invert pitch", IDC_JOY_INV_PITCH, 258, 299, 62, 10
+    AUTOCHECKBOX    "Invert throttle", IDC_JOY_INV_THR, 322, 299, 70, 10
+    AUTOCHECKBOX    "Invert rudder", IDC_JOY_INV_RUD, 396, 299, 70, 10
 
     // ------------------ the pickers: created hidden, revealed by Ctrl+Alt+S
-    GROUPBOX        "Weather in the rotation", IDC_SCENE_BOX, 7, 307, 465, 118, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Clear morning", IDC_SCENE_FIRST + 0, 14, 321, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Fair-weather cumulus", IDC_SCENE_FIRST + 1, 128, 321, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Towering cumulus", IDC_SCENE_FIRST + 2, 242, 321, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Thunderstorm", IDC_SCENE_FIRST + 3, 356, 321, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Heavy rain", IDC_SCENE_FIRST + 4, 14, 333, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Sea of clouds", IDC_SCENE_FIRST + 5, 128, 333, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Sunset", IDC_SCENE_FIRST + 6, 242, 333, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Sunrise over mountains", IDC_SCENE_FIRST + 7, 356, 333, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Moonlit night", IDC_SCENE_FIRST + 8, 14, 345, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Night thunderstorm", IDC_SCENE_FIRST + 9, 128, 345, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Moonlit cloud deck", IDC_SCENE_FIRST + 10, 242, 345, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Cirrus veil", IDC_SCENE_FIRST + 11, 356, 345, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Snowfall", IDC_SCENE_FIRST + 12, 14, 357, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Summer haze", IDC_SCENE_FIRST + 13, 128, 357, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Blue hour", IDC_SCENE_FIRST + 14, 242, 357, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Desert dust", IDC_SCENE_FIRST + 15, 356, 357, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Aurora borealis", IDC_SCENE_FIRST + 16, 14, 369, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Broken stratocumulus", IDC_SCENE_FIRST + 17, 128, 369, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Altocumulus", IDC_SCENE_FIRST + 18, 242, 369, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Tropical towers", IDC_SCENE_FIRST + 19, 356, 369, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Between the layers", IDC_SCENE_FIRST + 20, 14, 381, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Alpine", IDC_SCENE_FIRST + 21, 128, 381, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Arctic day", IDC_SCENE_FIRST + 22, 242, 381, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Drizzle", IDC_SCENE_FIRST + 23, 356, 381, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Golden sea", IDC_SCENE_FIRST + 24, 14, 393, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "Stormy sunset", IDC_SCENE_FIRST + 25, 128, 393, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "The Himalaya", IDC_SCENE_FIRST + 26, 242, 393, 110, 10, NOT WS_VISIBLE
-    PUSHBUTTON      "All", IDC_SCENE_ALL, 14, 407, 44, 14, NOT WS_VISIBLE
-    PUSHBUTTON      "None", IDC_SCENE_NONE, 62, 407, 44, 14, NOT WS_VISIBLE
+    GROUPBOX        "Weather in the rotation", IDC_SCENE_BOX, 7, 325, 465, 118, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Clear morning", IDC_SCENE_FIRST + 0, 32, 321, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Fair-weather cumulus", IDC_SCENE_FIRST + 1, 146, 321, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Towering cumulus", IDC_SCENE_FIRST + 2, 260, 321, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Thunderstorm", IDC_SCENE_FIRST + 3, 374, 321, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Heavy rain", IDC_SCENE_FIRST + 4, 32, 333, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Sea of clouds", IDC_SCENE_FIRST + 5, 146, 333, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Sunset", IDC_SCENE_FIRST + 6, 260, 333, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Sunrise over mountains", IDC_SCENE_FIRST + 7, 374, 333, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Moonlit night", IDC_SCENE_FIRST + 8, 32, 345, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Night thunderstorm", IDC_SCENE_FIRST + 9, 146, 345, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Moonlit cloud deck", IDC_SCENE_FIRST + 10, 260, 345, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Cirrus veil", IDC_SCENE_FIRST + 11, 374, 345, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Snowfall", IDC_SCENE_FIRST + 12, 32, 357, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Summer haze", IDC_SCENE_FIRST + 13, 146, 357, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Blue hour", IDC_SCENE_FIRST + 14, 260, 357, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Desert dust", IDC_SCENE_FIRST + 15, 374, 357, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Aurora borealis", IDC_SCENE_FIRST + 16, 32, 369, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Broken stratocumulus", IDC_SCENE_FIRST + 17, 146, 369, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Altocumulus", IDC_SCENE_FIRST + 18, 260, 369, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Tropical towers", IDC_SCENE_FIRST + 19, 374, 369, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Between the layers", IDC_SCENE_FIRST + 20, 32, 381, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Alpine", IDC_SCENE_FIRST + 21, 146, 381, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Arctic day", IDC_SCENE_FIRST + 22, 260, 381, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Drizzle", IDC_SCENE_FIRST + 23, 374, 381, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Golden sea", IDC_SCENE_FIRST + 24, 32, 393, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "Stormy sunset", IDC_SCENE_FIRST + 25, 146, 393, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "The Himalaya", IDC_SCENE_FIRST + 26, 260, 393, 110, 10, NOT WS_VISIBLE
+    PUSHBUTTON      "All", IDC_SCENE_ALL, 14, 425, 44, 14, NOT WS_VISIBLE
+    PUSHBUTTON      "None", IDC_SCENE_NONE, 62, 425, 44, 14, NOT WS_VISIBLE
 
-    GROUPBOX        "Cameras in the rotation", IDC_CAM_BOX, 7, 429, 465, 68, NOT WS_VISIBLE
-    AUTOCHECKBOX    "1  On the nose", IDC_CAM_FIRST + 0, 14, 443, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "2  Between the engines", IDC_CAM_FIRST + 1, 128, 443, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "3  On the spine, aft", IDC_CAM_FIRST + 2, 242, 443, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "4  On top of the fin", IDC_CAM_FIRST + 3, 356, 443, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "5  Right wingtip", IDC_CAM_FIRST + 4, 14, 455, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "6  Cockpit roof", IDC_CAM_FIRST + 5, 128, 455, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "7  Side window", IDC_CAM_FIRST + 6, 242, 455, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "8  Under the chin", IDC_CAM_FIRST + 7, 356, 455, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "9  Behind an engine", IDC_CAM_FIRST + 8, 14, 467, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "0  Tailplane tip", IDC_CAM_FIRST + 9, 128, 467, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "-  Chase plane", IDC_CAM_FIRST + 10, 242, 467, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "=  Wingman", IDC_CAM_FIRST + 11, 356, 467, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "G  Around the aircraft", IDC_CAM_FIRST + 12, 14, 479, 110, 10, NOT WS_VISIBLE
-    AUTOCHECKBOX    "=  High above", IDC_CAM_FIRST + 13, 128, 479, 110, 10, NOT WS_VISIBLE
+    GROUPBOX        "Cameras in the rotation", IDC_CAM_BOX, 7, 447, 465, 68, NOT WS_VISIBLE
+    AUTOCHECKBOX    "1  On the nose", IDC_CAM_FIRST + 0, 32, 443, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "2  Between the engines", IDC_CAM_FIRST + 1, 146, 443, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "3  On the spine, aft", IDC_CAM_FIRST + 2, 260, 443, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "4  On top of the fin", IDC_CAM_FIRST + 3, 374, 443, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "5  Right wingtip", IDC_CAM_FIRST + 4, 32, 455, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "6  Cockpit roof", IDC_CAM_FIRST + 5, 146, 455, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "7  Side window", IDC_CAM_FIRST + 6, 260, 455, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "8  Under the chin", IDC_CAM_FIRST + 7, 374, 455, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "9  Behind an engine", IDC_CAM_FIRST + 8, 32, 467, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "0  Tailplane tip", IDC_CAM_FIRST + 9, 146, 467, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "-  Chase plane", IDC_CAM_FIRST + 10, 260, 467, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "=  Wingman", IDC_CAM_FIRST + 11, 374, 467, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "G  Around the aircraft", IDC_CAM_FIRST + 12, 32, 479, 110, 10, NOT WS_VISIBLE
+    AUTOCHECKBOX    "=  High above", IDC_CAM_FIRST + 13, 146, 479, 110, 10, NOT WS_VISIBLE
 
-    PUSHBUTTON      "Defaults", IDC_DEFAULTS, 7, 307, 54, 14
-    PUSHBUTTON      "Preview...", IDC_PREVIEW, 65, 307, 60, 14
-    DEFPUSHBUTTON   "OK", IDOK, 360, 307, 52, 14
-    PUSHBUTTON      "Cancel", IDCANCEL, 418, 307, 54, 14
+    PUSHBUTTON      "Defaults", IDC_DEFAULTS, 7, 325, 54, 14
+    PUSHBUTTON      "Preview...", IDC_PREVIEW, 65, 325, 60, 14
+    DEFPUSHBUTTON   "OK", IDOK, 360, 325, 52, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 418, 325, 54, 14
 END
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,2,1,0
- PRODUCTVERSION 1,2,1,0
+ FILEVERSION 1,3,0,0
+ PRODUCTVERSION 1,3,0,0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS VOS_NT_WINDOWS32
@@ -165,13 +170,13 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Andrii Kamlyk"
             VALUE "FileDescription", "Mriya screensaver"
-            VALUE "FileVersion", "1.2.1.0"
+            VALUE "FileVersion", "1.3.0.0"
             VALUE "InternalName", "Mriya"
             VALUE "LegalCopyright", "Copyright (c) 2026 Andrii Kamlyk. MIT License."
             VALUE "Comments", "OpenGL screensaver: flying the An-225 Mriya through the weather. Open source."
             VALUE "OriginalFilename", "Mriya.scr"
             VALUE "ProductName", "Mriya"
-            VALUE "ProductVersion", "1.2.1.0"
+            VALUE "ProductVersion", "1.3.0.0"
         END
     END
     BLOCK "VarFileInfo"

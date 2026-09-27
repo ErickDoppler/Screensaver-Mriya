@@ -83,6 +83,13 @@ enum {
     /* Real time: the daylight and the live weather of a place (its name is  \
      * a string of its own, "rt-place"); coordinates in 1e-4 degrees. */ \
     X(real_time,          "real-time",          0,      0,   1)    \
+    /* Daylight and weather are asked for separately. Daylight off means the \
+     * hour is the user's own (time_of_day, minutes past midnight); weather  \
+     * on means the place's live conditions, and a change of scenery then    \
+     * changes only where the aircraft is, not what the sky is doing. */ \
+    X(rt_daylight,        "rt-daylight",        1,      0,   1)    \
+    X(rt_weather,         "rt-weather",         1,      0,   1)    \
+    X(time_of_day,        "time-of-day",        780,    0,   1439) \
     X(rt_lat,             "rt-lat",             0,  -900000, 900000) \
     X(rt_lon,             "rt-lon",             0, -1800000, 1800000) \
     X(camera_mask,        "camera-mask",        CAM_ALL, 0,  CAM_ALL) \

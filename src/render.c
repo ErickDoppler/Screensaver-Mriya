@@ -174,9 +174,25 @@ static unsigned make_fbo(unsigned color0, unsigned color1) {
 static void del_tex(unsigned *t) { if (*t) { glDeleteTextures(1, t); *t = 0; } }
 static void del_fbo(unsigned *f) { if (*f) { glDeleteFramebuffers(1, f); *f = 0; } }
 
+static int g_quality_vr;
+void render_quality_for_vr(int on) { g_quality_vr = on; }
+
 Quality render_quality(int setting) {
     float q = clampf(setting / 100.f, 0.f, 1.f);
     Quality o;
+    if (g_quality_vr) {
+        /* In a headset the clouds are drawn near the eye's own resolution.
+         * Below about two thirds they read as a mesh laid over the distance:
+         * thin far cloud is finer than the buffer they are marched into, and
+         * no upsampling puts that back. */
+        float t = q;
+        o.scale = lerpf(0.6f, 1.0f, t);
+        o.cloud_scale = lerpf(0.5f, 1.0f, t);
+        o.cloud_steps = (int)lerpf(48.f, 160.f, t);
+        o.samples = q < 0.2f ? 1 : (q < 0.55f ? 2 : 4);
+        o.shadow_size = setting < 40 ? 1024 : 2048;
+        return o;
+    }
     /* The top two thirds keep the picture sharp (70-100% resolution, full
      * multisampling) and spend the difference on the clouds; the bottom third
      * is for integrated graphics, and gives up resolution and samples too. */
@@ -1202,7 +1218,7 @@ void render_frame(Renderer *r, const Frame *f) {
         u2f(p, "uPrevTanLo", r->prev_tan_l[ey], r->prev_tan_d[ey]);
         u2f(p, "uPrevTanHi", r->prev_tan_r[ey], r->prev_tan_u[ey]);
         u3f(p, "uCamDelta", (float)dcam.x, (float)dcam.y, (float)dcam.z);
-        u1f(p, "uBlend", valid ? 0.88f : 0.f);
+        u1f(p, "uBlend", valid ? (g_quality_vr ? 0.93f : 0.88f) : 0.f);
         u2f(p, "uRes", (float)r->cw, (float)r->ch);
         draw_fullscreen();
         r->hist_idx[ey] = out;
@@ -1398,53 +1414,6 @@ void render_frame(Renderer *r, const Frame *f) {
             glBindBuffer(GL_ARRAY_BUFFER, 0);
         }
     }
-    /* The headset's menu: a page on a quad in the world, with the pointer
-     * rays that work it. Drawn last and without depth, so it can always be
-     * read whatever it is hanging in front of. */
-    if (f->ui_tex && f->ui_alpha > 0.01f) {
-        float q[3][12];
-        int nq = 0;
-        vec3 ux = v3_scale(f->ui_basis.x, f->ui_w), uy = v3_scale(f->ui_basis.y, f->ui_h);
-        q[nq][0] = f->ui_pos.x; q[nq][1] = f->ui_pos.y; q[nq][2] = f->ui_pos.z; q[nq][3] = 0.f;
-        q[nq][4] = ux.x; q[nq][5] = ux.y; q[nq][6] = ux.z; q[nq][7] = 0.f;
-        q[nq][8] = uy.x; q[nq][9] = uy.y; q[nq][10] = uy.z; q[nq][11] = 0.f;
-        nq++;
-        for (int h = 0; h < 2 && nq < 3; ++h) {
-            if (!f->ray_on[h]) continue;
-            vec3 a0 = f->ray_from[h], b0 = f->ray_to[h];
-            vec3 mid = v3_scale(v3_add(a0, b0), 0.5f);
-            vec3 along = v3_sub(b0, a0);
-            vec3 side = v3_cross(v3_norm(along), v3_norm(mid));
-            float sl = v3_len(side);
-            side = sl > 1e-4f ? v3_scale(side, 0.008f / sl) : v3(0.008f, 0.f, 0.f);
-            q[nq][0] = mid.x; q[nq][1] = mid.y; q[nq][2] = mid.z; q[nq][3] = 0.f;
-            q[nq][4] = side.x; q[nq][5] = side.y; q[nq][6] = side.z; q[nq][7] = 0.f;
-            q[nq][8] = along.x; q[nq][9] = along.y; q[nq][10] = along.z; q[nq][11] = 1.f;
-            nq++;
-        }
-        unsigned pnl = r->p_panel;
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDisable(GL_DEPTH_TEST);
-        glUseProgram(pnl);
-        um4(pnl, "uViewProj", &vp_ac);
-        tex(pnl, "uPage", 0, GL_TEXTURE_2D, f->ui_tex);
-        u1f(pnl, "uAlpha", f->ui_alpha);
-        glBindBuffer(GL_ARRAY_BUFFER, r->trail_vbo);
-        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(sizeof(float) * 12 * (size_t)nq), q, GL_STREAM_DRAW);
-        for (int i = 0; i < 3; ++i) {
-            glEnableVertexAttribArray((GLuint)i);
-            glVertexAttribDivisor((GLuint)i, 1);
-            glVertexAttribPointer((GLuint)i, 4, GL_FLOAT, GL_FALSE, 48, (void *)(size_t)(i * 16));
-        }
-        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, nq);
-        for (int i = 0; i < 3; ++i) {
-            glVertexAttribDivisor((GLuint)i, 0);
-            glDisableVertexAttribArray((GLuint)i);
-        }
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
-
     /* the navigation lights */
     if (f->nav_lights) {
         unsigned p = r->p_lights;
@@ -1537,7 +1506,10 @@ void render_frame(Renderer *r, const Frame *f) {
         u3f(p, "uSun", su, sv, front ? 1.f : 0.f);
         u3v(p, "uSunLum", v3_scale(L.sun_illum, 800.f));
         u1f(p, "uLens", f->lens ? 1.f : 0.f);
-        u1f(p, "uDrops", f->cam_on_airframe && !f->cam_external ? fmaxf(w->rain, w->snow * 0.3f) : 0.f);
+        /* Rain beads on the glass only where there is rain: above the deck
+         * the air is dry however hard it is falling underneath. */
+        u1f(p, "uDrops", f->cam_on_airframe && !f->cam_external
+                             ? fmaxf(w->rain, w->snow * 0.3f) * f->in_cloud : 0.f);
         /* water on the lens runs away from the direction of flight */
         {
             vec3 fwd = v3_scale(f->ac_basis.z, -1.f);
@@ -1564,6 +1536,67 @@ void render_frame(Renderer *r, const Frame *f) {
         u1f(p, "uFade", f->fade);
         draw_fullscreen();
     }
+    /* The headset's menu: a page on a quad in the world, with the pointer
+     * rays that work it. Drawn last and without depth, so it can always be
+     * read whatever it is hanging in front of. */
+    if ((f->ui_tex && f->ui_alpha > 0.01f) || (f->ui2_tex && f->ui2_alpha > 0.01f)) {
+        glBindFramebuffer(GL_FRAMEBUFFER, f->target_fbo);
+        glViewport(0, 0, r->width, r->height);
+        float q[4][12];
+        int nq = 0;
+        /* the panels: each may be there or not, and each is drawn with its
+         * own page - the HUD's instruments, the menu's page */
+        for (int pi = 0; pi < 2; ++pi) {
+            unsigned t = pi == 0 ? f->ui_tex : f->ui2_tex;
+            float al = pi == 0 ? f->ui_alpha : f->ui2_alpha;
+            if (!t || al <= 0.01f) continue;
+            vec3 p0 = pi == 0 ? f->ui_pos : f->ui2_pos;
+            basis3 b0 = pi == 0 ? f->ui_basis : f->ui2_basis;
+            vec3 ux = v3_scale(b0.x, pi == 0 ? f->ui_w : f->ui2_w);
+            vec3 uy = v3_scale(b0.y, pi == 0 ? f->ui_h : f->ui2_h);
+            q[nq][0] = p0.x; q[nq][1] = p0.y; q[nq][2] = p0.z; q[nq][3] = (float)pi;
+            q[nq][4] = ux.x; q[nq][5] = ux.y; q[nq][6] = ux.z; q[nq][7] = 0.f;
+            q[nq][8] = uy.x; q[nq][9] = uy.y; q[nq][10] = uy.z; q[nq][11] = 0.f;
+            nq++;
+        }
+        for (int h = 0; h < 2 && nq < 4; ++h) {
+            if (!f->ray_on[h]) continue;
+            vec3 a0 = f->ray_from[h], b0 = f->ray_to[h];
+            vec3 mid = v3_scale(v3_add(a0, b0), 0.5f);
+            vec3 along = v3_sub(b0, a0);
+            vec3 side = v3_cross(v3_norm(along), v3_norm(mid));
+            float sl = v3_len(side);
+            side = sl > 1e-4f ? v3_scale(side, 0.008f / sl) : v3(0.008f, 0.f, 0.f);
+            q[nq][0] = mid.x; q[nq][1] = mid.y; q[nq][2] = mid.z; q[nq][3] = 2.f;
+            q[nq][4] = side.x; q[nq][5] = side.y; q[nq][6] = side.z; q[nq][7] = 0.f;
+            q[nq][8] = along.x; q[nq][9] = along.y; q[nq][10] = along.z; q[nq][11] = 0.f;
+            nq++;
+        }
+        unsigned pnl = r->p_panel;
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_DEPTH_TEST);
+        glUseProgram(pnl);
+        um4(pnl, "uViewProj", &vp_ac);
+        tex(pnl, "uPage", 0, GL_TEXTURE_2D, f->ui_tex ? f->ui_tex : f->ui2_tex);
+        tex(pnl, "uPage2", 1, GL_TEXTURE_2D, f->ui2_tex ? f->ui2_tex : f->ui_tex);
+        u1f(pnl, "uAlpha", f->ui_alpha > 0.01f ? f->ui_alpha : f->ui2_alpha);
+        u1f(pnl, "uAlpha2", f->ui2_alpha);
+        glBindBuffer(GL_ARRAY_BUFFER, r->trail_vbo);
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(sizeof(float) * 12 * (size_t)nq), q, GL_STREAM_DRAW);
+        for (int i = 0; i < 3; ++i) {
+            glEnableVertexAttribArray((GLuint)i);
+            glVertexAttribDivisor((GLuint)i, 1);
+            glVertexAttribPointer((GLuint)i, 4, GL_FLOAT, GL_FALSE, 48, (void *)(size_t)(i * 16));
+        }
+        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, nq);
+        for (int i = 0; i < 3; ++i) {
+            glVertexAttribDivisor((GLuint)i, 0);
+            glDisableVertexAttribArray((GLuint)i);
+        }
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+
     gpu_timer_end(r);
 #ifdef MR_DEBUG
     gl_check("render_frame");

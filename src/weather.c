@@ -491,6 +491,28 @@ void weather_change_to(WeatherState *w, int kind, int quick) {
              terrain_biome_name(w->next.biome));
 }
 
+void weather_next_place(WeatherState *w) {
+    if (w->passage_dir > 0) return;
+    /* the same weather over somewhere else: only the ground is dealt again */
+    Weather next = w->cur;
+    int biome = rng_int(&w->rng, BIOME_COUNT);
+    next.biome = biome;
+    w->from = w->cur;
+    w->next = next;
+    w->t_from = w->terrain.to && w->terrain.biome_mix > 0.5f ? *w->terrain.to : w->terrain;
+    w->t_from.to = NULL;
+    w->t_from.biome_mix = 0.f;
+    w->t_from.biome2 = w->t_from.biome;
+    ground_for(w, &next, &w->t_to);
+    w->wblend = 1.f;                 /* the sky does not change at all */
+    w->tblend = 0.f;
+    w->morph_time = MORPH_TIME;
+    w->quick = 0;
+    w->since_change = 0.f;
+    w->dealt = 1;
+    plat_log("weather: moving on to %s, the sky unchanged", terrain_biome_name(biome));
+}
+
 void weather_to(WeatherState *w, const Weather *target, int quick) {
     w->from = w->cur;
     w->t_from = w->terrain.to && w->terrain.biome_mix > 0.5f ? *w->terrain.to : w->terrain;
