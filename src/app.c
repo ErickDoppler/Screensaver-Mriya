@@ -55,6 +55,7 @@ typedef struct App {
     int         lens;           /* which lens the menu last chose */
     float       vr_zoom;        /* the virtual camera's magnification, 1 = as the headset sees */
     int         own_daylight;   /* the sun and moon are ours to place, not the scenario's */
+    int         hour_set;       /* the hour was moved by hand since the scenery changed */
     int         wx_minutes_was; /* the scenery rotation, while live weather has it stopped */
     int         place_lookup;   /* a city is being looked up */
     float       in_cloud;       /* how much of the aircraft is in the weather */
@@ -601,9 +602,17 @@ static int using_place(const App *a) {
     return (a->s.rt_daylight || a->s.rt_weather) && (a->s.rt_lat || a->s.rt_lon);
 }
 
+/* The place's real daylight: a clock that keeps running, so it holds through
+ * every change of scenery. */
+static int live_daylight(const App *a) { return a->s.rt_daylight && using_place(a); }
+
 static void apply_daylight(App *a) {
-    /* Ours whenever the hour is set by hand, or a place gives us a real one. */
-    a->own_daylight = !a->s.rt_daylight || using_place(a);
+    /* Each scenario brings its own hour - that is what a sunset or a night
+     * storm is - so the sky is the scenario's unless something else is
+     * clearly in charge: the place's real daylight, or the hour slider,
+     * which holds only until the scenery changes and hands its own time
+     * back. */
+    a->own_daylight = live_daylight(a) || (!a->s.rt_daylight && a->hour_set);
     if (!a->own_daylight) return;
     double lat = a->s.rt_lat / 1e4, lon = a->s.rt_lon / 1e4;
     if (!using_place(a)) { lat = 50.0; lon = 10.0; }
@@ -716,7 +725,13 @@ static void simulate(App *a, float dt) {
         }
     }
     int wx = weather_update(&a->ws, &a->s, dt, a->fl.pos);
-    if (wx & 1) aim_for_weather(a);
+    if (wx & 1) {
+        aim_for_weather(a);
+        /* a new scenario comes with its own hour: the slider's is let go of */
+        if (a->hour_set) plat_log("time: the scenery's own hour again");
+        a->hour_set = 0;
+        apply_daylight(a);
+    }
     if (wx & 2) place_for_weather(a, 0);
     if (a->place_lookup) {
         char name[128];
@@ -838,7 +853,12 @@ static void menu_apply(App *a, int what, int value) {
         apply_weather_source(a);
         break;
     case VRMENU_TIME_OF_DAY:
+        /* Moving the hour is what puts it in charge, and only until the
+         * scenery changes: then the new one's own time takes over again. */
         a->s.time_of_day = value;
+        if (!a->hour_set)
+            plat_log("time: the hour is set by hand until the scenery changes");
+        a->hour_set = 1;
         apply_daylight(a);
         break;
     case VRMENU_LENS:
@@ -1346,8 +1366,10 @@ int app_run(const AppConfig *cfg) {
         if (a.s.rt_weather || a.s.rt_daylight) want_place(&a);
         apply_weather_source(&a);
         apply_daylight(&a);
-        plat_log("time: %s daylight%s, %s weather", a.s.rt_daylight ? "live" : "set by hand",
-                 a.own_daylight ? "" : " (the scenario's own)", a.real ? "live" : "the scenario's");
+        plat_log("time: daylight %s, weather %s",
+                 a.own_daylight ? "live over the place"
+                                : "the scenery's own (the hour takes charge only when it is moved)",
+                 a.real ? "live over the place" : "the scenery's own");
     }
     {
         char sub[128];

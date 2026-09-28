@@ -265,9 +265,10 @@ not quit at a touch.
 
 It holds the cameras, the scenery, the quality, the autopilot's timeout, the
 real daylight and weather and the hour - and **Exit**. Quality set by hand
-switches off the automatic adjustment for the rest of the run. Nothing chosen
-there is written to the saved settings, which stay as the settings dialog left
-them.
+switches off the automatic adjustment for the rest of the run, and the hour
+holds the sky until the scenery next changes. **Real daylight** and **Real
+weather** are saved as soon as they are ticked, and are the same two settings
+the dialog and the headset's menu show; the rest last for the run.
 
 ### Joystick
 
@@ -331,7 +332,7 @@ arguments there (`--rt-lat` and `--rt-lon`, in 1e-4 degrees).
 | **Flight** | whether the keys fly the aircraft, how long the autopilot waits, the racetrack's leg length and turn diameter, how often it changes altitude, time compression, and the aircraft's weight |
 | **Scenery** | how often the weather and the camera change, the HUD (off, captions, full), metric or imperial, navigation lights, lens effects |
 | **Picture** | field of view, glow, quality (0 = automatic) and a frame rate limit |
-| **Real time** | the city to fly over, **Real daylight**, **Real weather**, and the hour to use when the daylight is not the real one |
+| **Real time** | the city to fly over, **Real daylight**, **Real weather**, and the hour the daylight slider starts at |
 | **Joystick** | which axes to invert, and the name of the stick it found |
 
 **The city is only a place.** Type it, press **Find**, and it is remembered;
@@ -343,6 +344,13 @@ without the other. With neither ticked the scenery rotates as it always does.
 **Those two are one setting each, wherever you set them** - this dialog, the
 F2 panel or the headset's menu. Ticked in any of the three, they are saved at
 once, are in force everywhere, and the next run starts with them.
+
+**Every scenario brings its own hour** - that is what a sunset, a blue hour or
+a night storm is - so **Time of day** does not hold the sky at one time all
+run. Move it, in the F2 panel or the headset's menu, and it takes the sky over
+from that moment until the scenery next changes; the new scenario then gets
+its own light back. With **Real daylight** on, the place's real clock is in
+charge instead and the hour is greyed out.
 
 **Ctrl+Alt+S** in the dialog reveals two more pickers and grows the window:
 which of the 27 scenarios and which of the 13 cameras take part in the

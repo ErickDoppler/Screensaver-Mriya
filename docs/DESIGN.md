@@ -109,7 +109,11 @@ visibility, precipitation, wind and temperature set the rest.
 The daylight and the weather are asked for separately: with the hour set by
 hand the sky is lit for that minute of today over the same place, and with the
 live weather the scenery rotation moves the aircraft to new ground instead of
-dealing a new sky. The city is only a place: naming one does nothing until
+dealing a new sky. Each scenario carries its own hour, though - that is what a
+sunset or a night storm is - so the hand-set hour is not a standing setting:
+moving the slider puts it in charge (`hour_set`), and the next scenario dealt
+takes the sky back. The place's real daylight is a clock that keeps running,
+so it holds through every change. The city is only a place: naming one does nothing until
 the daylight or the weather is asked for, and those two are one setting each
 however they are reached - the settings dialog, the F2 panel or the headset's
 menu. Set in any of them they are written to the store there and then, so the
