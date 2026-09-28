@@ -376,18 +376,12 @@ static void refresh_dependencies(HWND dlg) {
     enable_group(dlg, sens_group, 3, get_check(dlg, IDC_EXITMOUSE));
     static const int ap_group[] = { IDC_APRES_LBL, IDC_APRES, IDC_APRES_VAL };
     enable_group(dlg, ap_group, 3, get_check(dlg, IDC_MANUAL));
-    static const int rt_group[] = { IDC_RT_CITY, IDC_RT_FIND, IDC_RT_PLACE,
-                                    IDC_RT_DAYLIGHT, IDC_RT_WEATHER };
-    enable_group(dlg, rt_group, 5, get_check(dlg, IDC_RT));
-    /* Ticked with neither of the two beside it asked for, it would do nothing
-     * at all: take it as meaning both, which is what it used to mean. */
-    if (get_check(dlg, IDC_RT) && !get_check(dlg, IDC_RT_DAYLIGHT) && !get_check(dlg, IDC_RT_WEATHER)) {
-        set_check(dlg, IDC_RT_DAYLIGHT, 1);
-        set_check(dlg, IDC_RT_WEATHER, 1);
-    }
+    /* The city is always there to be typed and looked up: it is a place, and
+     * on its own it changes nothing. The two check-boxes beside it say what
+     * is taken from it. */
     /* the hour is the user's own only when the place's daylight is not used */
     static const int tod_group[] = { IDC_TOD, IDC_TOD_VAL, IDC_TOD_LABEL };
-    enable_group(dlg, tod_group, 3, !get_check(dlg, IDC_RT) || !get_check(dlg, IDC_RT_DAYLIGHT));
+    enable_group(dlg, tod_group, 3, !get_check(dlg, IDC_RT_DAYLIGHT));
 }
 
 static void settings_to_controls(HWND dlg) {
@@ -410,8 +404,6 @@ static void settings_to_controls(HWND dlg) {
     CheckRadioButton(dlg, IDC_UNITS_M, IDC_UNITS_IMP, IDC_UNITS_M + g_s.units);
     set_check(dlg, IDC_NAVLIGHTS, g_s.nav_lights);
     set_check(dlg, IDC_LENS, g_s.lens_effects);
-    /* the tick-box follows the two beside it: it is on when either is */
-    set_check(dlg, IDC_RT, g_s.real_time || g_s.rt_daylight || g_s.rt_weather);
     set_check(dlg, IDC_RT_DAYLIGHT, g_s.rt_daylight);
     set_check(dlg, IDC_RT_WEATHER, g_s.rt_weather);
     set_slider(dlg, IDC_TOD, 0, 1439, g_s.time_of_day);
@@ -472,12 +464,12 @@ static void controls_to_settings(HWND dlg) {
     g_s.units = get_check(dlg, IDC_UNITS_IMP) ? UNITS_IMPERIAL : UNITS_METRIC;
     g_s.nav_lights         = get_check(dlg, IDC_NAVLIGHTS);
     g_s.lens_effects       = get_check(dlg, IDC_LENS);
-    /* "Fly over" is not a switch of its own: it is whether either of the two
-     * beside it is asked for. Unticked, neither is - and then nothing in the
-     * screensaver or the headset's menu is looking at a real place. */
-    g_s.real_time          = get_check(dlg, IDC_RT);
-    g_s.rt_daylight        = g_s.real_time && get_check(dlg, IDC_RT_DAYLIGHT);
-    g_s.rt_weather         = g_s.real_time && get_check(dlg, IDC_RT_WEATHER);
+    /* The same two settings the F2 panel and the headset's menu show; the
+     * old single "real-time" switch is kept only as their sum, so a setting
+     * saved before they were split still reads the way it was meant. */
+    g_s.rt_daylight        = get_check(dlg, IDC_RT_DAYLIGHT);
+    g_s.rt_weather         = get_check(dlg, IDC_RT_WEATHER);
+    g_s.real_time          = g_s.rt_daylight || g_s.rt_weather;
     g_s.time_of_day        = get_slider(dlg, IDC_TOD);
     g_s.joy_inv_roll       = get_check(dlg, IDC_JOY_INV_ROLL);
     g_s.joy_inv_pitch      = get_check(dlg, IDC_JOY_INV_PITCH);

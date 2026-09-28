@@ -66,11 +66,13 @@
 #define IDC_SCENE_ALL     1160
 #define IDC_SCENE_NONE    1161
 
-/* Real time. The five below start at 1069 because 1064-1068 belong to the
- * joystick group: two controls with one id in the same dialog means
+/* Real time. The city is only a place; what is taken from it is the two
+ * check-boxes, which are the same settings the F2 panel and the headset's
+ * menu show. The ids from 1069 up start there because 1064-1068 belong to
+ * the joystick group: two controls with one id in the same dialog means
  * GetDlgItem answers with whichever it finds first, and the two groups read
  * and write each other's boxes. */
-#define IDC_RT            1060
+#define IDC_RT_CITY_LBL   1060
 #define IDC_RT_CITY       1061
 #define IDC_RT_FIND       1062
 #define IDC_RT_PLACE      1063

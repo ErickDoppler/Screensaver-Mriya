@@ -624,6 +624,17 @@ static void want_place(App *a) {
     plat_log("real time: looking up %s", a->rt_place);
 }
 
+/* The real daylight and the real weather are one setting each, wherever they
+ * are set: the settings dialog, the F2 panel or the headset's menu. Changed
+ * in any of them they are written out at once, so the other two show them
+ * the next time they are opened and the next run starts with them. */
+static void save_real_time(App *a) {
+    a->s.real_time = a->s.rt_daylight || a->s.rt_weather;
+    plat_store_write_int("rt-daylight", a->s.rt_daylight);
+    plat_store_write_int("rt-weather", a->s.rt_weather);
+    plat_store_write_int("real-time", a->s.real_time);
+}
+
 static void apply_weather_source(App *a) {
     int want = a->s.rt_weather && using_place(a);
     if (want == a->real) return;
@@ -815,16 +826,15 @@ static void menu_apply(App *a, int what, int value) {
         a->s.autopilot_resume = value; break;
     case VRMENU_RT_DAYLIGHT:
         a->s.rt_daylight = !a->s.rt_daylight;
-        /* and the dialog's tick-box follows what was asked for here */
-        a->s.real_time = a->s.rt_daylight || a->s.rt_weather;
         if (a->s.rt_daylight) want_place(a);
+        save_real_time(a);
         apply_weather_source(a);
         apply_daylight(a);
         break;
     case VRMENU_RT_WEATHER:
         a->s.rt_weather = !a->s.rt_weather;
-        a->s.real_time = a->s.rt_daylight || a->s.rt_weather;
         if (a->s.rt_weather) want_place(a);
+        save_real_time(a);
         apply_weather_source(a);
         break;
     case VRMENU_TIME_OF_DAY:

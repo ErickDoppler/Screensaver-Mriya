@@ -43,13 +43,15 @@ The 3D engine and the tooling come from
   night, snow, and sea with sun glitter. The ground is one height function
   shared by the flight model and the renderer, so what the aircraft flies over
   is exactly what you see.
-* **Real time.** Give it a city and it flies in that place's daylight, sun and
+* **Real time.** Name a city and it can fly in that place's daylight, sun and
   moon, and its live weather (from [Open-Meteo](https://open-meteo.com), no
-  account needed; only the place is sent). The two are asked for separately:
+  account needed; only the place is sent). The two are separate switches:
   take its daylight and keep the scenery's own weather, take its weather and
-  set the hour yourself, or both. With the live weather a change of scenery
-  moves the aircraft to new ground and leaves the sky alone - the weather of a
-  real place is not ours to deal.
+  set the hour yourself, or both. They are the same two settings in the
+  settings dialog, the F2 panel and the headset's menu - set in one, set
+  everywhere, and saved. With the live weather a change of scenery moves the
+  aircraft to new ground and leaves the sky alone - the weather of a real
+  place is not ours to deal.
 * **The aircraft** is a detailed model in the Antonov Airlines livery, drawn
   procedurally so every line is sharp at any distance: the cheatline and the
   grey belly measured off a reference texture, the engine swooshes measured off
@@ -319,8 +321,9 @@ has been touched for a minute, and never in a headset.
 
 On Windows the screensaver has its own dialog (**Settings...** in the Windows
 screensaver page, or run the `.scr` with no arguments). On Linux the scenery,
-flight and picture settings are on the XScreenSaver page; the rest, real time
-included, are `--<setting> <value>` arguments there.
+flight and picture settings and the two real-time boxes are on the
+XScreenSaver page; the rest, the city included, are `--<setting> <value>`
+arguments there (`--rt-lat` and `--rt-lon`, in 1e-4 degrees).
 
 | Group | What is in it |
 |---|---|
@@ -328,15 +331,18 @@ included, are `--<setting> <value>` arguments there.
 | **Flight** | whether the keys fly the aircraft, how long the autopilot waits, the racetrack's leg length and turn diameter, how often it changes altitude, time compression, and the aircraft's weight |
 | **Scenery** | how often the weather and the camera change, the HUD (off, captions, full), metric or imperial, navigation lights, lens effects |
 | **Picture** | field of view, glow, quality (0 = automatic) and a frame rate limit |
-| **Real time** | fly over a city, with its daylight, its weather, or both - and the hour to use when the daylight is not the real one |
+| **Real time** | the city to fly over, **Real daylight**, **Real weather**, and the hour to use when the daylight is not the real one |
 | **Joystick** | which axes to invert, and the name of the stick it found |
 
-**Fly over** is not a switch of its own: it means *use this place*, and it
-carries the two boxes beside it. Unticked, neither the daylight nor the weather
-of a real place is used, whatever the F2 panel or the headset's menu were told
-earlier; ticked, whichever of the two is ticked applies. The same two settings
-appear in the F2 panel and in the headset's menu, and asking for one there
-turns the place on.
+**The city is only a place.** Type it, press **Find**, and it is remembered;
+on its own it changes nothing. What is taken from it is the two boxes beside
+it: **Real daylight** puts the sun and moon where they really are over that
+city, **Real weather** flies its live conditions, and either can be used
+without the other. With neither ticked the scenery rotates as it always does.
+
+**Those two are one setting each, wherever you set them** - this dialog, the
+F2 panel or the headset's menu. Ticked in any of the three, they are saved at
+once, are in force everywhere, and the next run starts with them.
 
 **Ctrl+Alt+S** in the dialog reveals two more pickers and grows the window:
 which of the 27 scenarios and which of the 13 cameras take part in the
@@ -462,7 +468,7 @@ Setting keys (see `src/settings.h` for ranges and defaults):
 `exit-on-any-key`, `manual-flight`, `autopilot-resume`, `joy-invert-roll`,
 `joy-invert-pitch`, `joy-invert-throttle`, `joy-invert-rudder`,
 `weather-minutes`, `camera-minutes`, `scene-mask` (e.g. `sunset,aurora`),
-`real-time`, `rt-lat`, `rt-lon`, `rt-daylight`, `rt-weather`, `time-of-day`
+`rt-lat`, `rt-lon` (1e-4 degrees), `rt-daylight`, `rt-weather`, `time-of-day`
 (minutes past midnight), `camera-mask`, `leg-km`, `turn-km`,
 `altitude-change-km`, `time-scale`, `weight`, `fov`, `bloom`,
 `lens-effects`, `nav-lights`, `hud`, `units`, `quality` (0 = auto), `fps`.

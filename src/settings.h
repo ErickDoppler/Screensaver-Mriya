@@ -80,17 +80,20 @@ enum {
     X(weather_minutes,    "weather-minutes",    5,      0,   120)  \
     X(camera_minutes,     "camera-minutes",     5,      0,   60)   \
     X(scene_mask,         "scene-mask",         WX_ALL, 0,   WX_ALL) \
-    /* Real time: the daylight and the live weather of a place (its name is  \
-     * a string of its own, "rt-place"); coordinates in 1e-4 degrees.        \
-     * "real-time" is the dialog's "Fly over" tick-box: it is the two below  \
-     * taken together, not a third switch. Off, settings_load clears them.*/ \
+    /* Real time. The place is a place: its name is a string of its own      \
+     * ("rt-place") and its coordinates are below, in 1e-4 degrees, and      \
+     * naming one changes nothing by itself. These two say what is taken     \
+     * from it, and they are the same two the F2 panel and the headset's     \
+     * menu show - set in any of the three, they are saved at once and are   \
+     * in force everywhere. Daylight off means the hour is the user's own    \
+     * (time_of_day, minutes past midnight); weather on means the place's    \
+     * live conditions, and a change of scenery then changes only where the  \
+     * aircraft is, not what the sky is doing.                               \
+     * "real-time" is no longer a switch: it is kept as the sum of the two,  \
+     * so a setting saved before they were split still reads as it meant. */ \
     X(real_time,          "real-time",          0,      0,   1)    \
-    /* Daylight and weather are asked for separately. Daylight off means the \
-     * hour is the user's own (time_of_day, minutes past midnight); weather  \
-     * on means the place's live conditions, and a change of scenery then    \
-     * changes only where the aircraft is, not what the sky is doing. */ \
-    X(rt_daylight,        "rt-daylight",        1,      0,   1)    \
-    X(rt_weather,         "rt-weather",         1,      0,   1)    \
+    X(rt_daylight,        "rt-daylight",        0,      0,   1)    \
+    X(rt_weather,         "rt-weather",         0,      0,   1)    \
     X(time_of_day,        "time-of-day",        780,    0,   1439) \
     X(rt_lat,             "rt-lat",             0,  -900000, 900000) \
     X(rt_lon,             "rt-lon",             0, -1800000, 1800000) \

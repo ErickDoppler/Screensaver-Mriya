@@ -27,10 +27,10 @@ void settings_load(Settings *s) {
 #define X(field, key, def, mn, mx) if (plat_store_read_int(key, &v)) s->field = v;
     MR_SETTINGS_INT(X)
 #undef X
-    /* The place is used by whoever asks for its daylight or its weather;
-     * "real-time" is the old single switch, kept as what the dialog's "Fly
-     * over" tick-box shows. A setting saved before the two were split says
-     * off while they still say on, and off is what the user asked for. */
+    /* A setting saved before the daylight and the weather were split says
+     * off in the old single switch while the two still say on, and off is
+     * what the user asked for. Once either is saved again, "real-time" is
+     * written as their sum and this does nothing. */
     if (!s->real_time) s->rt_daylight = s->rt_weather = 0;
     settings_clamp(s);
 }

@@ -83,11 +83,11 @@ BEGIN
 
     // ---------------------------------------------------------- real time
     GROUPBOX        "Real time", IDC_STATIC, 7, 224, 465, 58
-    AUTOCHECKBOX    "Fly over", IDC_RT, 14, 238, 50, 10
-    EDITTEXT        IDC_RT_CITY, 68, 236, 180, 13, ES_AUTOHSCROLL
-    PUSHBUTTON      "Find", IDC_RT_FIND, 252, 235, 44, 14
-    AUTOCHECKBOX    "Its daylight", IDC_RT_DAYLIGHT, 306, 238, 62, 10
-    AUTOCHECKBOX    "Its weather", IDC_RT_WEATHER, 376, 238, 66, 10
+    LTEXT           "City", IDC_RT_CITY_LBL, 14, 238, 18, 8
+    EDITTEXT        IDC_RT_CITY, 36, 236, 182, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "Find", IDC_RT_FIND, 222, 235, 44, 14
+    AUTOCHECKBOX    "Real daylight", IDC_RT_DAYLIGHT, 282, 238, 74, 10
+    AUTOCHECKBOX    "Real weather", IDC_RT_WEATHER, 362, 238, 74, 10
     LTEXT           "", IDC_RT_PLACE, 14, 252, 454, 8
     LTEXT           "Time of day", IDC_TOD_LABEL, 14, 267, 50, 8
     CONTROL         "", IDC_TOD, "msctls_trackbar32", TBS_HORZ | WS_TABSTOP, 68, 264, 228, 15

@@ -54,6 +54,10 @@
     </select>
     <boolean id="nav"  _label="Navigation lights, beacons and strobes" arg-unset="--no-nav-lights"/>
     <boolean id="lens" _label="Lens effects (rain on the lens, sun flare)" arg-unset="--no-lens-effects"/>
+    <!-- Both need a place to be about: pass it with --rt-lat and --rt-lon, in
+         1e-4 degrees, since there is no city box on this page. -->
+    <boolean id="rtday" _label="Real daylight of the place (--rt-lat / --rt-lon)" arg-set="--rt-daylight 1"/>
+    <boolean id="rtwx"  _label="Real weather of the place (--rt-lat / --rt-lon)" arg-set="--rt-weather 1"/>
    </vgroup>
   </hgroup>
 

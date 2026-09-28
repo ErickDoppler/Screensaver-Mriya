@@ -109,11 +109,13 @@ visibility, precipitation, wind and temperature set the rest.
 The daylight and the weather are asked for separately: with the hour set by
 hand the sky is lit for that minute of today over the same place, and with the
 live weather the scenery rotation moves the aircraft to new ground instead of
-dealing a new sky. There is no third switch deciding whether the place counts:
-asking for its daylight or its weather is what uses it, wherever the asking
-was done - the dialog, the F2 panel or the headset's menu - and the dialog's
-"Fly over" tick-box is the two of them together, so the three can never
-disagree.
+dealing a new sky. The city is only a place: naming one does nothing until
+the daylight or the weather is asked for, and those two are one setting each
+however they are reached - the settings dialog, the F2 panel or the headset's
+menu. Set in any of them they are written to the store there and then, so the
+other two show them and the next run begins with them. (`real-time`, the
+single switch they were split out of, is kept as their sum: a setting saved
+before the split still reads the way it was meant.)
 
 ## VR
 

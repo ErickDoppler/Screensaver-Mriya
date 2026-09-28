@@ -131,7 +131,7 @@ static int rows_of(const VrMenu *m, const Settings *s, int hud_on, int camera, i
         }
         if (n < cap) {
             out[n] = (Row){ "Real weather", 2, VRMENU_RT_WEATHER, 0, s->rt_weather, 0.f, "" };
-            if (!have_place)
+            if (!have_place && s->rt_weather)
                 snprintf(out[n].right, sizeof out[n].right, "no city set");
             n++;
         }
