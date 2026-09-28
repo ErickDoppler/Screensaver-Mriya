@@ -2,67 +2,88 @@
 
 A 3D screensaver that flies you through volumetric clouds on the Antonov
 An-225 *Mriya* - the largest aircraft ever built. Twenty-seven weather
-scenarios, from a clear morning to a night thunderstorm and the aurora,
-change gradually into one another over a procedural world; thirteen cameras
-ride the airframe or fly alongside it; an autopilot flies a racetrack at
-changing altitudes, and you can take the controls at any time with the
-keyboard or a joystick.
+scenarios, from a clear morning to a night thunderstorm and the aurora, change
+gradually into one another over a procedural world; thirteen cameras ride the
+airframe or fly alongside it; an autopilot flies a racetrack at changing
+altitudes, and you can take the controls at any time with the keyboard, a
+joystick - or from inside a VR headset.
 
-![Mriya over the sea at golden hour](docs/screenshot-hero.jpg)
+![The An-225 above a storm at golden hour, contrails behind it](docs/screenshot-hero.jpg)
+
+**Windows: runs well, including in VR.** **Linux (XScreenSaver): the code and
+scripts are written, but not yet tested on a Linux machine.**
+
+| | |
+|---|---|
+| ![Storm tops from the orbit camera](docs/screenshot-storm.jpg) | ![An engine and the wing from the side window at sunset](docs/screenshot-engine.jpg) |
+| ![Sunrise over the mountains](docs/screenshot-sunrise.jpg) | ![The aurora from the wingtip](docs/screenshot-aurora.jpg) |
+| ![Blue hour over farmland](docs/screenshot-bluehour.jpg) | ![Over the Himalaya](docs/screenshot-himalaya.jpg) |
 
 The 3D engine and the tooling come from
 [The Black Hole](https://github.com/ErickDoppler/Screensaver-TheBlackHole).
 
-Status: **Windows: runs well.** **Linux (XScreenSaver): the code and scripts
-are written, but not yet tested on Linux.**
-
-| | |
-|---|---|
-| ![Sunset from the side window](docs/screenshot-sunset.jpg) | ![Aurora borealis from the spine](docs/screenshot-aurora.jpg) |
-| ![Over the Himalaya](docs/screenshot-himalaya.jpg) | ![Towering cumulus, the globe camera](docs/screenshot-towering.jpg) |
-
 ## What it does
 
 * **Clouds** are raymarched volumes: two layers of heaped and flat cloud, a
-  cirrus veil, rain shafts and lightning, lit by a physically based sky
-  (the sun, the moon and its phase, multiple scattering) and casting shadows
-  on the ground. Fly into one and the world goes grey.
+  cirrus veil, rain shafts and lightning, lit by a physically based sky (the
+  sun, the moon and its phase, multiple scattering) and casting shadows on the
+  ground. Fly into one and the world goes grey. The shapes come from noise at
+  three scales that is dragged about by slower noise, so a deck of cloud has
+  waves and lumps in it but no pattern that repeats.
 * **27 weather scenarios** - clear, cumulus, towering cumulus, thunderstorm,
   heavy rain, sea of clouds, sunset, sunrise, moonlit night, night storm,
   moonlit deck, cirrus, snowfall, haze, blue hour, desert dust, aurora,
   stratocumulus, altocumulus, tropical towers, between the layers, alpine,
-  arctic day, drizzle, golden sea, stormy sunset and the Himalaya. None
-  repeats until all have been shown. A change takes a minute: the sky turns
-  and the ground reshapes itself under the aircraft - plains rising into
-  ranges, the sea flooding in - then it holds for five.
+  arctic day, drizzle, golden sea, stormy sunset and the Himalaya. None repeats
+  until all have been shown. A change takes a minute: the sky turns and the
+  ground reshapes itself under the aircraft - plains rising into ranges, the
+  sea flooding in - then it holds for five.
+* **The world** is procedural and endless: continents, eroded ridged
+  mountains, hills, dunes, rivers, fields, forest, towns that light up at
+  night, snow, and sea with sun glitter. The ground is one height function
+  shared by the flight model and the renderer, so what the aircraft flies over
+  is exactly what you see.
 * **Real time.** Give it a city and it flies in that place's daylight, sun and
   moon, and its live weather (from [Open-Meteo](https://open-meteo.com), no
-  account needed; only the place is sent). The two are separate: take the
-  daylight and keep the scenery's own weather, take the weather and set the
-  hour yourself, or both. With the live weather the scenery change moves the
-  aircraft to new ground rather than bringing a new sky.
+  account needed; only the place is sent). The two are asked for separately:
+  take its daylight and keep the scenery's own weather, take its weather and
+  set the hour yourself, or both. With the live weather a change of scenery
+  moves the aircraft to new ground and leaves the sky alone - the weather of a
+  real place is not ours to deal.
 * **The aircraft** is a detailed model in the Antonov Airlines livery, drawn
-  procedurally so every line is sharp at any distance: the cheatline measured
-  off a reference texture, the titles set in type, glass windscreen panes,
-  turning fans, a glowing turbine deep in each exhaust, working ailerons,
-  elevators and rudders, flexing wings, contrails, navigation lights and
-  strobes.
+  procedurally so every line is sharp at any distance: the cheatline and the
+  grey belly measured off a reference texture, the engine swooshes measured off
+  photographs, the titles set in type, glass windscreen panes, turning fans, a
+  glowing turbine deep in each exhaust, working ailerons, elevators and rudders,
+  wings that flex with the load, contrails, navigation lights and strobes, and
+  the heat shimmer behind the engines.
+
+  ![The cheatline and two engines from between them](docs/screenshot-livery.jpg)
+
 * **Flight model.** A 300-640 t freighter with the real aircraft's power: the
   stick asks for a pitch rate (3 deg/s slow, 10 deg/s from 540 km/h), the
   ceiling is wherever the thrust runs out, and a terrain floor 50 m above the
-  ground takes over gently if you dive at it.
+  ground takes over gently if you dive at it. Weather is felt where the weather
+  is: in cloud in a storm the wings work and rain beads on the glass, above the
+  same storm's deck there is neither - and nothing shakes the airframe about,
+  because three hundred tonnes and an 88 m wing do not judder.
 * **VR.** With a headset plugged in it goes stereo through OpenXR, which both
-  the Oculus runtime and SteamVR speak; no loader library is shipped, the
-  active runtime is found and loaded at start-up. The controllers turn, move
-  and zoom the camera, change the scenery and the camera, and put up a menu
-  panel in the world; the flight HUD hangs on the glass ahead, pointing where
-  the aircraft is going. Nothing moves the view by itself in a headset, and
-  the horizon keeps only a tenth of the aircraft's roll and pitch. Tested on
-  a Quest 2.
+  the Oculus runtime and SteamVR speak. The controllers turn, move and zoom the
+  camera, change the camera and the scenery, and put up a menu panel in the
+  world; the flight HUD hangs on the glass ahead, squared to the aircraft
+  rather than to your head. Nothing moves the view by itself in a headset, and
+  the horizon keeps only a tenth of the aircraft's roll and pitch. Tested on a
+  Quest 2.
 * **Thirteen cameras**, four views on most: the nose (with a flight HUD), the
   cockpit roof, the spine, the fin top, a wingtip, the side window, the chin,
   behind an engine, between the engines, the tailplane, a chase plane, a
   wingman, and a free orbit round the aircraft.
+* **It behaves like a screensaver.** Automatic quality measures the frame time
+  on the first run and settles the render scale, cloud resolution and step
+  count so the GPU is busy for a third to a half of each frame - a quiet fan on
+  a machine nobody is using. It runs on Intel integrated graphics, needs only
+  OpenGL 3.3, is one file with no dependencies, and installs without
+  administrator rights.
 
 ## Run it
 
@@ -107,6 +128,11 @@ pins the `.scr` wherever it happens to sit, so a copy in the build folder or
 in Downloads stops working the moment it is deleted - and Windows then does
 nothing at all on idle, without a word.
 
+There is also a ready-built `Mriya-*-win64.zip` on the
+[releases page](https://github.com/ErickDoppler/Screensaver-Mriya/releases) to
+try before building. It is not code-signed, so SmartScreen may ask for
+confirmation.
+
 To look at it before installing, build with
 `2-build-and-install-windows.cmd noinstall` and run
 `build\win-mingw\Mriya.scr /w` for a window or `/s` for fullscreen. `Esc`
@@ -136,6 +162,19 @@ Get-ItemProperty 'HKCU:\Control Panel\Desktop' | Select-Object 'SCRNSAVE.EXE', S
 * **Something is holding the display awake** - `powercfg /requests` lists what
   (a video call, a browser tab, a game).
 
+### In a headset
+
+Plug in a headset and start it as usual: if an OpenXR runtime is there and a
+headset is connected, it goes stereo by itself and the window on the monitor
+becomes a mirror of the left eye. Nothing needs installing beyond the runtime
+you already use - the Oculus app or SteamVR - and no loader library is
+shipped: the active runtime is found in the registry and loaded at start-up.
+
+Because the runtime owns the display, the usual ways out are disabled in a
+headset: a mouse button or a key will not end it, and **Alt+F4** is the way
+out. Automatic camera rotation is off there too, and the picture is set for 90
+frames a second.
+
 ### Linux
 
 The screensaver runs inside [XScreenSaver](https://www.jwz.org/xscreensaver/),
@@ -143,8 +182,8 @@ which works on any X11 desktop (Xfce, MATE, Cinnamon, LXQt, i3 and others).
 Debian/Ubuntu, Fedora, Arch and openSUSE are supported by the scripts.
 
 > **Not yet tested on Linux.** The code and scripts are written, but have not
-> yet been compiled or run on a Linux machine. Please report anything that
-> fails.
+> yet been compiled or run on a Linux machine. VR is Windows-only for now.
+> Please report anything that fails.
 
 1. **Get the build tools.** Installs the compiler, CMake, Ninja, the X11,
    OpenGL and Wayland headers SDL3 needs, and XScreenSaver through your
@@ -201,25 +240,46 @@ Press **F1** at any time for this list on screen.
 | H | flight HUD on / off |
 | Print Screen | save the frame to `Pictures\Mriya` and copy it to the clipboard |
 | F1 | the key list |
-| F2 | the settings panel: quality, real weather, real daylight, time of day, cameras, scenery |
-| Esc | exit (always) |
+| F2 | the settings panel |
+| Esc | exit (always, except in a headset) |
 
-**The settings panel (F2)** is the same menu the headset has, in the middle of
-the screen, worked with the mouse: click a row, drag a slider, the wheel runs
-down the long lists, Escape or F2 puts it away. While it is up the screensaver
-will not quit at a touch. Quality set by hand switches off the automatic
-adjustment for the rest of the run; nothing chosen there is written to the
-saved settings, which stay as the settings dialog left them.
+### The flight HUD
 
-**Joystick.** X and Y fly roll and pitch, a twist grip is the rudder and the
-throttle lever sets the power. The first half of the stick's travel gives only
-a tenth of the authority, for fine control, rising to all of it at the stops.
-Button 2 toggles the autopilot. With a joystick connected the autopilot never
-takes over just because you stopped touching things - only when you ask, or
-when the ground is coming. Each axis can be inverted in the settings.
+**H** puts it up on any camera, and the nose camera carries it by default: an
+attitude ladder with the flight path marker, speed and altitude tapes, Mach,
+ground speed, vertical speed and the selected altitude, the compass, and what
+the autopilot is doing.
 
-**In a headset** the controllers fly nothing - the aircraft flies itself, or
-the joystick flies it - and work the view instead:
+![The flight HUD from the nose camera](docs/screenshot-hud.jpg)
+
+### The settings panel (F2)
+
+**F2** puts up the same menu the headset has, in the middle of the screen,
+worked with the mouse: click a row, drag a slider, the wheel runs down the long
+lists, **Escape** or **F2** puts it away. While it is up the screensaver will
+not quit at a touch.
+
+![The settings panel over a cloud sea](docs/screenshot-menu.jpg)
+
+It holds the cameras, the scenery, the quality, the autopilot's timeout, the
+real daylight and weather and the hour - and **Exit**. Quality set by hand
+switches off the automatic adjustment for the rest of the run. Nothing chosen
+there is written to the saved settings, which stay as the settings dialog left
+them.
+
+### Joystick
+
+X and Y fly roll and pitch, a twist grip is the rudder and the throttle lever
+sets the power. The first half of the stick's travel gives only a tenth of the
+authority, for fine control, rising to all of it at the stops. Button 2 toggles
+the autopilot. With a joystick connected the autopilot never takes over just
+because you stopped touching things - only when you ask, or when the ground is
+coming. Each axis can be inverted in the settings.
+
+### In a headset
+
+The controllers fly nothing - the aircraft flies itself, or the joystick flies
+it - and work the view instead:
 
 | Control | Action |
 |---|---|
@@ -230,25 +290,60 @@ the joystick flies it - and work the view instead:
 | Trigger (index finger) | grab the camera and slide it: any direction |
 | Trigger + stick | turn the view and zoom, as the stick alone |
 | Grip and trigger together | let go: back to where the camera's preset has it |
+| Stick click | back to the first scenery |
 | A / X | the next camera |
 | B / Y | the menu, and away again |
 | Trigger on the panel | work a row or a slider |
-| Alt+F4 | exit - a mouse button or Escape will not, in a headset |
+| Alt+F4 | exit |
 
-The menu appears in front of wherever you are looking, and its **Settings**
-page has the quality, the autopilot's timeout, the lens (Portrait, Normal,
-Telescopic, Wide, Fisheye), the real daylight and weather, and the hour.
+The menu appears in front of wherever you are looking. Its **Settings** page
+has the quality, the autopilot's timeout, the lens (Portrait, Normal,
+Telescopic, Wide, Fisheye), the real daylight and weather, and the hour; a city
+typed into the settings dialog is looked up from inside the headset if **Find**
+was never pressed.
+
+### The autopilot and the rotation
 
 **The autopilot** flies a racetrack: 1000 km straight, a right turn 40 km
 across, 1000 km back, picking a new altitude between 1000 and 11,000 m every
-300 km. Touch the controls and the aircraft is yours; leave them for 20
-seconds and it takes back over, keeping your heading. Taken over below
-2000 m above the ground, it climbs back to that first.
+300 km. Touch the controls and the aircraft is yours; leave them for 20 seconds
+and it takes back over, keeping your heading. Taken over below 2000 m above the
+ground, it climbs back to that first.
 
-The cameras rotate on their own, five minutes each and none repeating until
+**The cameras** rotate on their own, five minutes each and none repeating until
 all have been shown - but only when nobody is there: not while you are flying
-the aircraft, not for ten minutes after you pick a camera, and not until
-nothing has been touched for a minute.
+the aircraft, not for ten minutes after you pick a camera, not until nothing
+has been touched for a minute, and never in a headset.
+
+## Settings
+
+On Windows the screensaver has its own dialog (**Settings...** in the Windows
+screensaver page, or run the `.scr` with no arguments). On Linux the scenery,
+flight and picture settings are on the XScreenSaver page; the rest, real time
+included, are `--<setting> <value>` arguments there.
+
+| Group | What is in it |
+|---|---|
+| **Input** | whether the mouse looks around or exits, how far it must move to exit, and whether any key exits or the keys fly |
+| **Flight** | whether the keys fly the aircraft, how long the autopilot waits, the racetrack's leg length and turn diameter, how often it changes altitude, time compression, and the aircraft's weight |
+| **Scenery** | how often the weather and the camera change, the HUD (off, captions, full), metric or imperial, navigation lights, lens effects |
+| **Picture** | field of view, glow, quality (0 = automatic) and a frame rate limit |
+| **Real time** | fly over a city, with its daylight, its weather, or both - and the hour to use when the daylight is not the real one |
+| **Joystick** | which axes to invert, and the name of the stick it found |
+
+**Fly over** is not a switch of its own: it means *use this place*, and it
+carries the two boxes beside it. Unticked, neither the daylight nor the weather
+of a real place is used, whatever the F2 panel or the headset's menu were told
+earlier; ticked, whichever of the two is ticked applies. The same two settings
+appear in the F2 panel and in the headset's menu, and asking for one there
+turns the place on.
+
+**Ctrl+Alt+S** in the dialog reveals two more pickers and grows the window:
+which of the 27 scenarios and which of the 13 cameras take part in the
+rotation.
+
+Settings persist in `HKCU\Software\Mriya` on Windows and in
+`~/.config/mriya/settings.conf` on Linux.
 
 ## Uninstall
 
@@ -299,6 +394,9 @@ Python. Re-running those tools needs numpy and Pillow and the reference images
 they read (not in the repository: a kit decal sheet and the texture of another
 An-225 model, which are not ours to redistribute).
 
+The OpenXR headers in `third_party/openxr/` are the Khronos ones; there is no
+loader to build or ship.
+
 ## Windows Defender
 
 A freshly compiled, unsigned `.scr` can trip Defender's machine-learning
@@ -308,9 +406,9 @@ own message queue), never starts other programs or relaunches itself, drops
 SDL's dynamic-API layer and unused code, and is stripped, statically linked,
 ASLR- and DEP-enabled, with full version information and a manifest.
 
-It does open two network connections, and only with *Real time* switched on:
-HTTPS to `geocoding-api.open-meteo.com` when you press **Find** in the
-settings, and to `api.open-meteo.com` every fifteen minutes while it runs.
+It does open two network connections, and only when a place is being flown
+over: HTTPS to `geocoding-api.open-meteo.com` to turn a city's name into
+coordinates, and to `api.open-meteo.com` every fifteen minutes while it runs.
 
 If Defender still flags it, report the false positive at
 https://www.microsoft.com/wdsi/filesubmission ("Software developer"), and
@@ -339,12 +437,16 @@ Developer switches (both platforms):
 | `--stick pitch roll from to` | hold the stick between two times, for testing the handling |
 | `--show-keys` | start with the F1 key list up |
 | `--show-menu [page]` | start with the F2 settings panel up (3 = its settings page) |
-| `--trace` | log the flight |
+| `--trace` | log the flight every 15 frames |
 | `--log file.txt` | append diagnostics to a file |
 | `--<setting> <value>` | override any setting, e.g. `--weight 640 --time-scale 10` |
 
 On Windows, launching a `.scr` from Explorer replaces its arguments with
 `/S`. To pass developer switches, run it from `cmd`, or copy it to a `.exe`.
+
+A run that must show one scenario's own sky needs the live weather out of the
+way: `--no-rt-weather --no-rt-daylight`, or the saved place's conditions
+replace whatever `--weather` asked for.
 
 Weather names: `clear`, `cumulus`, `towering`, `thunderstorm`, `heavy-rain`,
 `cloud-sea`, `sunset`, `sunrise`, `moonlight`, `night-storm`, `night-deck`,
@@ -366,9 +468,6 @@ Setting keys (see `src/settings.h` for ranges and defaults):
 `lens-effects`, `nav-lights`, `hud`, `units`, `quality` (0 = auto), `fps`.
 Boolean settings also take `--no-<key>`.
 
-Settings persist in `HKCU\Software\Mriya` on Windows and in
-`~/.config/mriya/settings.conf` on Linux.
-
 ## Layout
 
 ```
@@ -377,6 +476,8 @@ Settings persist in `HKCU\Software\Mriya` on Windows and in
 1-download-tools-linux.sh      packages + SDL3 source into ~/workenv (Linux)
 2-build-and-install-linux.sh   build, install into XScreenSaver (Linux)
 src/            portable C11 core (SDL3 + OpenGL 3.3), platform_win32.c / platform_linux.c
+src/vr.c        OpenXR: the runtime, the session, the eyes, the controllers
+src/vrmenu.c    the menu, on a panel in the world or on the screen
 src/shaders/    GLSL, embedded into the binary at build time
 res/models/     the aircraft (glTF binary), packed at build time
 res/textures/   the livery's decal atlas
@@ -385,15 +486,16 @@ res/linux/      XScreenSaver settings page
 cmake/          toolchain file + shader embedding script
 tools/          env / build / install scripts, meshpack, livery and icon generators
 docs/           design notes and screenshots
-third_party/    stb_image_write.h (public domain)
+third_party/    stb_image_write.h (public domain), the OpenXR headers
 ```
 
-See [docs/DESIGN.md](docs/DESIGN.md) for how it is drawn and flown.
+See [docs/DESIGN.md](docs/DESIGN.md) for how it is drawn and flown, and
+[CONTRIBUTING.md](CONTRIBUTING.md) for how to send a change.
 
 ## License
 
 MIT for the code. The aircraft model `res/models/Mriya.glb` is included for
 building the screensaver. Dependencies: SDL3 (zlib), stb (public domain /
-MIT), the OpenXR headers (Apache 2.0, Khronos). Build tools: w64devkit / GCC (GPL with runtime exception), CMake (BSD),
-Ninja (Apache 2.0). Weather data: [Open-Meteo](https://open-meteo.com)
-(CC BY 4.0).
+MIT), the OpenXR headers (Apache 2.0, Khronos). Build tools: w64devkit / GCC
+(GPL with runtime exception), CMake (BSD), Ninja (Apache 2.0). Weather data:
+[Open-Meteo](https://open-meteo.com) (CC BY 4.0).

@@ -593,12 +593,20 @@ static time_t sky_time(const App *a) {
  * clock over the place; otherwise the hour is the user's own. Without a place
  * of its own it uses a middling northern one, so the hour still means
  * something. */
+/* Whether the place the user named is used at all. There is no third switch
+ * for it: asking for its daylight or its weather is what uses it, wherever
+ * the asking was done - the settings dialog, the F2 panel or the headset's
+ * menu. The dialog's "Fly over" tick-box carries those two with it. */
+static int using_place(const App *a) {
+    return (a->s.rt_daylight || a->s.rt_weather) && (a->s.rt_lat || a->s.rt_lon);
+}
+
 static void apply_daylight(App *a) {
     /* Ours whenever the hour is set by hand, or a place gives us a real one. */
-    a->own_daylight = !a->s.rt_daylight || (a->s.rt_lat || a->s.rt_lon);
+    a->own_daylight = !a->s.rt_daylight || using_place(a);
     if (!a->own_daylight) return;
     double lat = a->s.rt_lat / 1e4, lon = a->s.rt_lon / 1e4;
-    if (!a->s.rt_lat && !a->s.rt_lon) { lat = 50.0; lon = 10.0; }
+    if (!using_place(a)) { lat = 50.0; lon = 10.0; }
     Weather *c = &a->ws.cur;
     realtime_sky(lat, lon, sky_time(a), &c->sun_elev, &c->sun_azim,
                  &c->moon_elev, &c->moon_azim, &c->moon_phase);
@@ -617,11 +625,7 @@ static void want_place(App *a) {
 }
 
 static void apply_weather_source(App *a) {
-    /* A place is what it needs. The dialog's own tick-box only says whether
-     * the place is used at all, and asking for the live weather in the menu
-     * says as much. */
-    if ((a->s.rt_weather || !a->s.rt_daylight) && (a->s.rt_lat || a->s.rt_lon)) a->s.real_time = 1;
-    int want = a->s.rt_weather && (a->s.rt_lat || a->s.rt_lon);
+    int want = a->s.rt_weather && using_place(a);
     if (want == a->real) return;
     if (want) {
         a->real = 1;
@@ -811,12 +815,15 @@ static void menu_apply(App *a, int what, int value) {
         a->s.autopilot_resume = value; break;
     case VRMENU_RT_DAYLIGHT:
         a->s.rt_daylight = !a->s.rt_daylight;
+        /* and the dialog's tick-box follows what was asked for here */
+        a->s.real_time = a->s.rt_daylight || a->s.rt_weather;
         if (a->s.rt_daylight) want_place(a);
         apply_weather_source(a);
         apply_daylight(a);
         break;
     case VRMENU_RT_WEATHER:
         a->s.rt_weather = !a->s.rt_weather;
+        a->s.real_time = a->s.rt_daylight || a->s.rt_weather;
         if (a->s.rt_weather) want_place(a);
         apply_weather_source(a);
         break;

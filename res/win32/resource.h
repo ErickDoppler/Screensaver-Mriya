@@ -66,16 +66,19 @@
 #define IDC_SCENE_ALL     1160
 #define IDC_SCENE_NONE    1161
 
-/* Real time */
+/* Real time. The five below start at 1069 because 1064-1068 belong to the
+ * joystick group: two controls with one id in the same dialog means
+ * GetDlgItem answers with whichever it finds first, and the two groups read
+ * and write each other's boxes. */
 #define IDC_RT            1060
 #define IDC_RT_CITY       1061
 #define IDC_RT_FIND       1062
 #define IDC_RT_PLACE      1063
-#define IDC_RT_DAYLIGHT   1064
-#define IDC_RT_WEATHER    1065
-#define IDC_TOD           1066
-#define IDC_TOD_VAL       1067
-#define IDC_TOD_LABEL     1068
+#define IDC_RT_DAYLIGHT   1069
+#define IDC_RT_WEATHER    1070
+#define IDC_TOD           1071
+#define IDC_TOD_VAL       1072
+#define IDC_TOD_LABEL     1073
 
 /* Joystick */
 #define IDC_JOY_NAME      1064

@@ -109,7 +109,11 @@ visibility, precipitation, wind and temperature set the rest.
 The daylight and the weather are asked for separately: with the hour set by
 hand the sky is lit for that minute of today over the same place, and with the
 live weather the scenery rotation moves the aircraft to new ground instead of
-dealing a new sky.
+dealing a new sky. There is no third switch deciding whether the place counts:
+asking for its daylight or its weather is what uses it, wherever the asking
+was done - the dialog, the F2 panel or the headset's menu - and the dialog's
+"Fly over" tick-box is the two of them together, so the three can never
+disagree.
 
 ## VR
 
