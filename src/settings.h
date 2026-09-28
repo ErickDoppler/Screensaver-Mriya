@@ -81,7 +81,9 @@ enum {
     X(camera_minutes,     "camera-minutes",     5,      0,   60)   \
     X(scene_mask,         "scene-mask",         WX_ALL, 0,   WX_ALL) \
     /* Real time: the daylight and the live weather of a place (its name is  \
-     * a string of its own, "rt-place"); coordinates in 1e-4 degrees. */ \
+     * a string of its own, "rt-place"); coordinates in 1e-4 degrees.        \
+     * "real-time" is the dialog's "Fly over" tick-box: it is the two below  \
+     * taken together, not a third switch. Off, settings_load clears them.*/ \
     X(real_time,          "real-time",          0,      0,   1)    \
     /* Daylight and weather are asked for separately. Daylight off means the \
      * hour is the user's own (time_of_day, minutes past midnight); weather  \

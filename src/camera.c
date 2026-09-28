@@ -268,20 +268,16 @@ void camera_update(CamState *c, const Settings *s, const Flight *f, float dt, in
         }
     }
 
-    /* Vibration: the airframe hums with the engines and, in real turbulence,
-     * bucks - slowly, a few times a second, as something this heavy does.
-     * Mounts far from the centre of mass swing more. */
+    /* Vibration: the airframe hums with the engines, and mounts far from the
+     * centre of mass swing more. Nothing bucks - a freighter this heavy does
+     * not judder, in any weather; the gusts work the wings instead. */
     float lever = 0.4f + v3_len(mp) / 40.f;
-    float chop = f->chop * lever;
     float hum = 0.00018f * f->engine_rpm * lever;
     float t = c->t;
     vec3 jitter = v3(
         (sinf(t * 23.1f + c->shake_phase[0]) + sinf(t * 37.7f + c->shake_phase[1])) * hum,
         (sinf(t * 19.3f + c->shake_phase[2]) + sinf(t * 41.9f + c->shake_phase[3])) * hum,
         0.f);
-    jitter.y += (sinf(t * 2.3f + c->shake_phase[4]) * 0.6f + sinf(t * 3.7f + c->shake_phase[5]) * 0.4f) *
-                0.035f * chop;
-    jitter.x += sinf(t * 1.9f + c->shake_phase[1]) * 0.02f * chop;
     if (m->external) jitter = v3_scale(jitter, 0.f);
     /* A shaking camera in a headset is a shaking room: damped right down. */
     if (c->hold_gaze) jitter = v3_scale(jitter, 0.2f);
@@ -312,8 +308,6 @@ void camera_update(CamState *c, const Settings *s, const Flight *f, float dt, in
     float dr = c->hold_gaze ? 0.f : DEG2RAD(m->drift);
     yaw += wander(t, 1.3f) * dr + c->look_yaw;
     pitch += wander(t, 4.1f) * dr * 0.45f + c->look_pitch;
-    if (!c->hold_gaze)
-        pitch += (sinf(t * 2.9f + c->shake_phase[3]) * 0.5f + sinf(t * 4.3f) * 0.5f) * 0.004f * chop;
 
     basis3 look = basis_yaw_pitch(yaw, pitch);
     if (roll_extra != 0.f) look = basis_mul(basis_roll(roll_extra), look);

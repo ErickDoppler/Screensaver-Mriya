@@ -183,7 +183,12 @@ static int json_library_path(const char *json_path, char *out, int cap) {
     char *slash2 = strrchr(dir, '/');
     if (slash2 > slash) slash = slash2;
     if (slash) *slash = 0; else dir[0] = 0;
-    snprintf(out, (size_t)cap, "%s\\%s", dir, lib);
+    /* A path that does not fit is no path at all: say so rather than hand
+     * back a truncated one for LoadLibrary to fail on. */
+    if (snprintf(out, (size_t)cap, "%s\\%s", dir, lib) >= cap) {
+        plat_log("vr: the runtime's path is too long: %s\\%s", dir, lib);
+        return 0;
+    }
     return 1;
 }
 

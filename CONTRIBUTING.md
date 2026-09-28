@@ -8,7 +8,15 @@ Pull requests are welcome.
 3. **Build and try it** on your platform before opening the pull request
    (see [README.md](README.md)). For rendering changes, a before/after
    screenshot helps a lot - for example
-   `Mriya.scr --window 1600x900 --dump out.png --frames 90 --weather sunset --camera window`.
+   `Mriya.scr --window 1600x900 --dump out.png --frames 90 --weather sunset --camera window --no-rt-weather --no-rt-daylight`
+   (the last two keep a saved city's live weather from replacing the scenario
+   you asked for). For anything touching the scenery rotation, run the
+   stress test over it; it compiles on its own and exits non-zero on the
+   first mismatch:
+
+   ```sh
+   gcc -O1 -Isrc tools/test_weather.c src/weather.c src/terrain.c src/settings.c -lm -o test_weather
+   ```
 4. **Open a pull request** against `main` here. Every pull request is reviewed
    by the maintainer, who approves and merges it.
 

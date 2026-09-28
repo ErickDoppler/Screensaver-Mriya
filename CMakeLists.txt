@@ -122,6 +122,11 @@ set(MR_SOURCES
   ${MR_SHADERS_GEN} ${MR_BLOBS_S})
 if(WIN32)
   list(APPEND MR_SOURCES src/platform_win32.c res/win32/mriya.rc)
+  # The resource compiler's own dependencies are not scanned: without this, a
+  # control id changed in resource.h leaves the dialog in the binary as it
+  # was, and only a clean build shows the change.
+  set_source_files_properties(res/win32/mriya.rc PROPERTIES
+    OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/res/win32/resource.h;${CMAKE_CURRENT_SOURCE_DIR}/res/win32/mriya.ico;${CMAKE_CURRENT_SOURCE_DIR}/res/win32/mriya.manifest")
 else()
   list(APPEND MR_SOURCES src/platform_linux.c)
 endif()

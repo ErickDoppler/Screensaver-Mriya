@@ -484,7 +484,8 @@ res/textures/   the livery's decal atlas
 res/win32/      dialog, manifest, icon, version info
 res/linux/      XScreenSaver settings page
 cmake/          toolchain file + shader embedding script
-tools/          env / build / install scripts, meshpack, livery and icon generators
+tools/          env / build / install scripts, meshpack, livery and icon
+                generators, and test_weather.c, a stress test for the rotation
 docs/           design notes and screenshots
 third_party/    stb_image_write.h (public domain), the OpenXR headers
 ```

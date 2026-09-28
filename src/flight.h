@@ -79,7 +79,6 @@ typedef struct Flight {
     /* what the eye sees */
     float  gust_n;             /* turbulence's share of the load factor */
     float  gust_roll, gust_yaw, gust_pitch;
-    float  chop;               /* high-frequency shake, 0..1 */
     float  flex, flex_v;       /* wingtip deflection (m) and its rate */
     float  engine_rpm;         /* 0..1 */
     float  ail, elev, rud;     /* control surface deflections, radians */

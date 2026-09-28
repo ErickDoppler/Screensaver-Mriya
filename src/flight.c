@@ -306,8 +306,6 @@ void flight_update(Flight *f, const Settings *s, const TerrainParams *t,
         /* a gust changes the angle of attack, and so the lift, before the
          * aircraft can do anything about it: this is what bends the wings */
         f->gust_n = (float)(CLA * (gv / v) * q * WING_AREA / w);
-        /* and nothing shudders: the shake is gone from the camera */
-        f->chop = 0.f;
 
         /* --- targets ------------------------------------------------------ */
         double bank_cmd, gamma_cmd;
